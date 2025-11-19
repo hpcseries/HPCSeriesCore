@@ -3,7 +3,8 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(tree:*)",
-      "Bash(cut:*)"
+      "Bash(cut:*)",
+      "Bash(docker compose run:*)"
     ],
     "deny": [],
     "ask": []

@@ -7,24 +7,39 @@
 !   - hpcs_rolling_mean: O(n) sliding window mean
 !   - hpcs_zscore:       Z-score normalization using Welford's algorithm
 !
-! All functions use C-compatible interfaces via iso_c_binding
+! All routines use C-compatible interfaces via iso_c_binding and return
+! status via an explicit integer(c_int) argument.
 ! ==============================================================================
 
 module hpcs_core_1d
-  use iso_c_binding, only: c_int, c_double
+  use iso_c_binding,  only: c_int, c_double
   use hpcs_constants
   implicit none
+  public
 
 contains
 
   !--------------------------------------------------------------------
   ! Rolling sum
+  !
   ! y(i) = sum of last window elements up to i (truncated near start)
+  !
+  ! Arguments (C view):
+  !   x   : const double*  (length >= n)
+  !   n   : int
+  !   w   : int  (window)
+  !   y   : double*        (length >= n)
+  !   st  : int*           (status)
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0
   !--------------------------------------------------------------------
   subroutine hpcs_rolling_sum(x, n, window, y, status) &
        bind(C, name="hpcs_rolling_sum")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)      ! length n
     integer(c_int),  value      :: n
     integer(c_int),  value      :: window
@@ -60,12 +75,18 @@ contains
 
   !--------------------------------------------------------------------
   ! Rolling mean
+  !
   ! y(i) = rolling_sum(i) / min(i, window)
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0
   !--------------------------------------------------------------------
   subroutine hpcs_rolling_mean(x, n, window, y, status) &
        bind(C, name="hpcs_rolling_mean")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)       ! length n
     integer(c_int),  value      :: n
     integer(c_int),  value      :: window
@@ -106,14 +127,19 @@ contains
 
   !--------------------------------------------------------------------
   ! Z-score transform
-  ! Uses two-pass Welford-style algorithm (serial)
-  ! status = 0: success
-  ! status = 2: zero stddev (numeric failure) – y set to 0
+  !
+  ! Uses two-pass Welford-style algorithm (serial).
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0
+  !   HPCS_ERR_NUMERIC_FAIL : stddev == 0 -> y set to 0
   !--------------------------------------------------------------------
   subroutine hpcs_zscore(x, n, y, status) &
        bind(C, name="hpcs_zscore")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)      ! length n
     integer(c_int),  value      :: n
     real(c_double), intent(out) :: y(*)      ! length n
@@ -125,14 +151,8 @@ contains
 
     n_eff = n
 
-    if (n_eff < 0_c_int) then
+    if (n_eff <= 0_c_int) then
        status = HPCS_ERR_INVALID_ARGS
-       return
-    end if
-
-    if (n_eff == 0_c_int) then
-       ! Empty input: nothing to do, consider it "success"
-       status = HPCS_SUCCESS
        return
     end if
 

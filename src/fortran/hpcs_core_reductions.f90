@@ -1,34 +1,42 @@
 ! ==============================================================================
 ! HPC Series Core Library - Reductions Module
-! Simple and grouped reduction operations
+! Simple 1D reductions and grouped reductions.
 !
 ! Implemented kernels:
-!   - hpcs_reduce_sum:        Simple sum reduction
-!   - hpcs_reduce_min:        Minimum value (returns +∞ for empty arrays)
-!   - hpcs_reduce_max:        Maximum value (returns -∞ for empty arrays)
-!   - hpcs_group_reduce_sum:  Group-wise sum (0-based group IDs)
-!   - hpcs_group_reduce_mean: Group-wise mean (NaN for empty groups)
+!   - hpcs_reduce_sum
+!   - hpcs_reduce_min
+!   - hpcs_reduce_max
+!   - hpcs_group_reduce_sum
+!   - hpcs_group_reduce_mean
 !
-! All functions use C-compatible interfaces via iso_c_binding
+! All routines:
+!   - use ISO_C_BINDING with bind(C)
+!   - return status via an explicit integer(c_int) argument
 ! ==============================================================================
 
 module hpcs_core_reductions
-  use iso_c_binding, only: c_int, c_double
+  use iso_c_binding,  only: c_int, c_double
+  use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
   use hpcs_constants
   implicit none
+  public
 
 contains
 
   !--------------------------------------------------------------------
-  ! Simple sum reduction
+  ! hpcs_reduce_sum
+  !
   ! out = sum(x(1:n))
-  ! n == 0 -> out = 0.0, success
-  ! n <  0 -> invalid args
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0
   !--------------------------------------------------------------------
   subroutine hpcs_reduce_sum(x, n, out, status) &
        bind(C, name="hpcs_reduce_sum")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)      ! length n
     integer(c_int),  value      :: n
     real(c_double), intent(out) :: out
@@ -39,14 +47,8 @@ contains
 
     n_eff = n
 
-    if (n_eff < 0_c_int) then
+    if (n_eff <= 0_c_int) then
        status = HPCS_ERR_INVALID_ARGS
-       return
-    end if
-
-    if (n_eff == 0_c_int) then
-       out = 0.0_c_double
-       status = HPCS_SUCCESS
        return
     end if
 
@@ -55,19 +57,24 @@ contains
        acc = acc + x(i)
     end do
 
-    out = acc
+    out    = acc
     status = HPCS_SUCCESS
   end subroutine hpcs_reduce_sum
 
   !--------------------------------------------------------------------
-  ! Reduce minimum
-  ! n == 0 -> out = +huge, success (sentinel)
-  ! n <  0 -> invalid args
+  ! hpcs_reduce_min
+  !
+  ! out = min(x(1:n))
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0
   !--------------------------------------------------------------------
   subroutine hpcs_reduce_min(x, n, out, status) &
        bind(C, name="hpcs_reduce_min")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)      ! length n
     integer(c_int),  value      :: n
     real(c_double), intent(out) :: out
@@ -78,15 +85,9 @@ contains
 
     n_eff = n
 
-    if (n_eff < 0_c_int) then
+    if (n_eff <= 0_c_int) then
        status = HPCS_ERR_INVALID_ARGS
        return
-    end if
-
-    if (n_eff == 0_c_int) then
-      out = huge(0.0_c_double)   ! +∞ sentinel
-      status = HPCS_SUCCESS
-      return
     end if
 
     minval = x(1_c_int)
@@ -94,19 +95,24 @@ contains
        if (x(i) < minval) minval = x(i)
     end do
 
-    out = minval
+    out    = minval
     status = HPCS_SUCCESS
   end subroutine hpcs_reduce_min
 
   !--------------------------------------------------------------------
-  ! Reduce maximum
-  ! n == 0 -> out = -huge, success (sentinel)
-  ! n <  0 -> invalid args
+  ! hpcs_reduce_max
+  !
+  ! out = max(x(1:n))
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0
   !--------------------------------------------------------------------
   subroutine hpcs_reduce_max(x, n, out, status) &
        bind(C, name="hpcs_reduce_max")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)      ! length n
     integer(c_int),  value      :: n
     real(c_double), intent(out) :: out
@@ -117,15 +123,9 @@ contains
 
     n_eff = n
 
-    if (n_eff < 0_c_int) then
+    if (n_eff <= 0_c_int) then
        status = HPCS_ERR_INVALID_ARGS
        return
-    end if
-
-    if (n_eff == 0_c_int) then
-      out = -huge(0.0_c_double)   ! -∞ sentinel
-      status = HPCS_SUCCESS
-      return
     end if
 
     maxval = x(1_c_int)
@@ -133,20 +133,28 @@ contains
        if (x(i) > maxval) maxval = x(i)
     end do
 
-    out = maxval
+    out    = maxval
     status = HPCS_SUCCESS
   end subroutine hpcs_reduce_max
 
   !--------------------------------------------------------------------
+  ! hpcs_group_reduce_sum
+  !
   ! Grouped sum:
   !   x(1:n), group_ids(1:n) in [0, n_groups-1]
   !   y(0:n_groups-1) stored as y(1:n_groups) in Fortran
-  ! Invalid group IDs are ignored.
+  !
+  ! Invalid group IDs (<0 or >= n_groups) are ignored.
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or n_groups <= 0
   !--------------------------------------------------------------------
   subroutine hpcs_group_reduce_sum(x, n, group_ids, n_groups, y, status) &
        bind(C, name="hpcs_group_reduce_sum")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)           ! length n
     integer(c_int),  value      :: n
     integer(c_int),  intent(in) :: group_ids(*)   ! length n
@@ -160,14 +168,8 @@ contains
     n_eff  = n
     ng_eff = n_groups
 
-    if (n_eff < 0_c_int .or. ng_eff < 0_c_int) then
+    if (n_eff <= 0_c_int .or. ng_eff <= 0_c_int) then
        status = HPCS_ERR_INVALID_ARGS
-       return
-    end if
-
-    if (ng_eff == 0_c_int) then
-       ! No groups – nothing to accumulate
-       status = HPCS_SUCCESS
        return
     end if
 
@@ -186,14 +188,23 @@ contains
   end subroutine hpcs_group_reduce_sum
 
   !--------------------------------------------------------------------
+  ! hpcs_group_reduce_mean
+  !
   ! Grouped mean:
   !   mean_k = sum_{i in group k} x(i) / count_k
-  ! Groups with zero count -> NaN
+  !
+  ! Groups with zero count -> NaN.
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or n_groups <= 0
+  !   HPCS_ERR_NUMERIC_FAIL : allocation failure (very unlikely)
   !--------------------------------------------------------------------
   subroutine hpcs_group_reduce_mean(x, n, group_ids, n_groups, y, status) &
        bind(C, name="hpcs_group_reduce_mean")
     use iso_c_binding, only: c_int, c_double
     implicit none
+
     real(c_double), intent(in)  :: x(*)           ! length n
     integer(c_int),  value      :: n
     integer(c_int),  intent(in) :: group_ids(*)   ! length n
@@ -201,29 +212,27 @@ contains
     real(c_double), intent(out) :: y(*)           ! length n_groups
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: i, g
-    integer(c_int) :: n_eff, ng_eff
+    integer(c_int)           :: i, g
+    integer(c_int)           :: n_eff, ng_eff
     real(c_double), allocatable :: group_sum(:)
     integer(c_int), allocatable :: group_count(:)
-    real(c_double) :: nan_val
+    integer(c_int)           :: istat
+    real(c_double)           :: nan_val
 
-    ! Use local pointers to automatic arrays
     n_eff  = n
     ng_eff = n_groups
 
-    if (n_eff < 0_c_int .or. ng_eff < 0_c_int) then
+    if (n_eff <= 0_c_int .or. ng_eff <= 0_c_int) then
        status = HPCS_ERR_INVALID_ARGS
        return
     end if
 
-    if (ng_eff == 0_c_int) then
-       status = HPCS_SUCCESS
+    ! Allocate temporary accumulators
+    allocate(group_sum(ng_eff), group_count(ng_eff), stat=istat)
+    if (istat /= 0_c_int) then
+       status = HPCS_ERR_NUMERIC_FAIL
        return
     end if
-
-    ! Automatic arrays sized by number of groups
-    allocate(group_sum(ng_eff))
-    allocate(group_count(ng_eff))
 
     group_sum   = 0.0_c_double
     group_count = 0_c_int
@@ -235,8 +244,8 @@ contains
        group_count(g + 1_c_int) = group_count(g + 1_c_int) + 1_c_int
     end do
 
-    ! Produce a NaN value for groups with zero count
-    nan_val = 0.0_c_double / 0.0_c_double
+    ! NaN value for empty groups
+    nan_val = ieee_value(0.0_c_double, ieee_quiet_nan)
 
     do g = 1_c_int, ng_eff
        if (group_count(g) > 0_c_int) then
@@ -246,8 +255,8 @@ contains
        end if
     end do
 
-    deallocate(group_sum)
-    deallocate(group_count)
+    deallocate(group_sum, group_count, stat=istat)
+    ! Ignore deallocation errors for now; we’ve already produced y.
 
     status = HPCS_SUCCESS
   end subroutine hpcs_group_reduce_mean
