@@ -35,3 +35,4 @@ Thumbs.db
 # Test outputs
 *.log
 test_results/
+docs/*

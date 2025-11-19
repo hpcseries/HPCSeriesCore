@@ -1,185 +1,171 @@
 ! ==============================================================================
 ! HPC Series Core Library - 1D Operations Module
 ! Rolling window operations and statistical transformations
+!
+! Implemented kernels:
+!   - hpcs_rolling_sum:  O(n) sliding window summation
+!   - hpcs_rolling_mean: O(n) sliding window mean
+!   - hpcs_zscore:       Z-score normalization using Welford's algorithm
+!
+! All functions use C-compatible interfaces via iso_c_binding
 ! ==============================================================================
 
 module hpcs_core_1d
-    use iso_c_binding
-    implicit none
+  use iso_c_binding, only: c_int, c_double
+  use hpcs_constants
+  implicit none
 
 contains
 
-    ! ==========================================================================
-    ! Rolling Mean
-    ! ==========================================================================
-    subroutine hpcs_rolling_mean(input, n, window, output) bind(C, name="hpcs_rolling_mean")
-        integer(c_size_t), intent(in), value :: n, window
-        real(c_double), intent(in) :: input(n)
-        real(c_double), intent(out) :: output(n)
+  !--------------------------------------------------------------------
+  ! Rolling sum
+  ! y(i) = sum of last window elements up to i (truncated near start)
+  !--------------------------------------------------------------------
+  subroutine hpcs_rolling_sum(x, n, window, y, status) &
+       bind(C, name="hpcs_rolling_sum")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)      ! length n
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)      ! length n
+    integer(c_int),  intent(out):: status
 
-        integer(c_size_t) :: i
-        real(c_double) :: sum_val
-        integer(c_size_t) :: start_idx, end_idx, count
+    integer(c_int) :: i
+    integer(c_int) :: n_eff, w_eff
+    real(c_double) :: sum
 
-        ! Handle initial window (partial)
-        do i = 1, min(window, n)
-            sum_val = sum(input(1:i))
-            output(i) = sum_val / real(i, c_double)
-        end do
+    n_eff = n
+    w_eff = window
 
-        ! Full window rolling
-        if (n > window) then
-            sum_val = sum(input(1:window))
-            do i = window + 1, n
-                sum_val = sum_val - input(i - window) + input(i)
-                output(i) = sum_val / real(window, c_double)
-            end do
-        end if
-    end subroutine hpcs_rolling_mean
+    if (n_eff <= 0_c_int .or. w_eff <= 0_c_int) then
+       status = HPCS_ERR_INVALID_ARGS
+       return
+    end if
 
-    ! ==========================================================================
-    ! Rolling Standard Deviation
-    ! ==========================================================================
-    subroutine hpcs_rolling_std(input, n, window, output) bind(C, name="hpcs_rolling_std")
-        integer(c_size_t), intent(in), value :: n, window
-        real(c_double), intent(in) :: input(n)
-        real(c_double), intent(out) :: output(n)
+    sum = 0.0_c_double
 
-        integer(c_size_t) :: i, j
-        real(c_double) :: mean_val, variance, diff
-        integer(c_size_t) :: start_idx, end_idx, count
+    do i = 1_c_int, n_eff
+       sum = sum + x(i)    ! add new element
 
-        do i = 1, n
-            start_idx = max(1_c_size_t, i - window + 1)
-            end_idx = i
-            count = end_idx - start_idx + 1
+       if (i > w_eff) then
+          sum = sum - x(i - w_eff)  ! subtract element leaving the window
+       end if
 
-            ! Calculate mean
-            mean_val = sum(input(start_idx:end_idx)) / real(count, c_double)
+       y(i) = sum
+    end do
 
-            ! Calculate variance
-            variance = 0.0_c_double
-            do j = start_idx, end_idx
-                diff = input(j) - mean_val
-                variance = variance + diff * diff
-            end do
-            variance = variance / real(count, c_double)
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_sum
 
-            output(i) = sqrt(variance)
-        end do
-    end subroutine hpcs_rolling_std
+  !--------------------------------------------------------------------
+  ! Rolling mean
+  ! y(i) = rolling_sum(i) / min(i, window)
+  !--------------------------------------------------------------------
+  subroutine hpcs_rolling_mean(x, n, window, y, status) &
+       bind(C, name="hpcs_rolling_mean")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)       ! length n
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)       ! length n
+    integer(c_int),  intent(out):: status
 
-    ! ==========================================================================
-    ! Rolling Minimum
-    ! ==========================================================================
-    subroutine hpcs_rolling_min(input, n, window, output) bind(C, name="hpcs_rolling_min")
-        integer(c_size_t), intent(in), value :: n, window
-        real(c_double), intent(in) :: input(n)
-        real(c_double), intent(out) :: output(n)
+    integer(c_int) :: i
+    integer(c_int) :: n_eff, w_eff, k
+    real(c_double) :: sum
 
-        integer(c_size_t) :: i, start_idx, end_idx
+    n_eff = n
+    w_eff = window
 
-        do i = 1, n
-            start_idx = max(1_c_size_t, i - window + 1)
-            end_idx = i
-            output(i) = minval(input(start_idx:end_idx))
-        end do
-    end subroutine hpcs_rolling_min
+    if (n_eff <= 0_c_int .or. w_eff <= 0_c_int) then
+       status = HPCS_ERR_INVALID_ARGS
+       return
+    end if
 
-    ! ==========================================================================
-    ! Rolling Maximum
-    ! ==========================================================================
-    subroutine hpcs_rolling_max(input, n, window, output) bind(C, name="hpcs_rolling_max")
-        integer(c_size_t), intent(in), value :: n, window
-        real(c_double), intent(in) :: input(n)
-        real(c_double), intent(out) :: output(n)
+    sum = 0.0_c_double
 
-        integer(c_size_t) :: i, start_idx, end_idx
+    do i = 1_c_int, n_eff
+       sum = sum + x(i)
+       if (i > w_eff) then
+          sum = sum - x(i - w_eff)
+       end if
 
-        do i = 1, n
-            start_idx = max(1_c_size_t, i - window + 1)
-            end_idx = i
-            output(i) = maxval(input(start_idx:end_idx))
-        end do
-    end subroutine hpcs_rolling_max
+       if (i < w_eff) then
+          k = i
+       else
+          k = w_eff
+       end if
 
-    ! ==========================================================================
-    ! Rolling Sum
-    ! ==========================================================================
-    subroutine hpcs_rolling_sum(input, n, window, output) bind(C, name="hpcs_rolling_sum")
-        integer(c_size_t), intent(in), value :: n, window
-        real(c_double), intent(in) :: input(n)
-        real(c_double), intent(out) :: output(n)
+       y(i) = sum / real(k, kind=c_double)
+    end do
 
-        integer(c_size_t) :: i
-        real(c_double) :: sum_val
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_mean
 
-        ! Initial window
-        do i = 1, min(window, n)
-            output(i) = sum(input(1:i))
-        end do
+  !--------------------------------------------------------------------
+  ! Z-score transform
+  ! Uses two-pass Welford-style algorithm (serial)
+  ! status = 0: success
+  ! status = 2: zero stddev (numeric failure) – y set to 0
+  !--------------------------------------------------------------------
+  subroutine hpcs_zscore(x, n, y, status) &
+       bind(C, name="hpcs_zscore")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)      ! length n
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: y(*)      ! length n
+    integer(c_int),  intent(out):: status
 
-        ! Rolling sum with sliding window
-        if (n > window) then
-            sum_val = sum(input(1:window))
-            do i = window + 1, n
-                sum_val = sum_val - input(i - window) + input(i)
-                output(i) = sum_val
-            end do
-        end if
-    end subroutine hpcs_rolling_sum
+    integer(c_int)  :: i, n_eff
+    real(c_double)  :: mean, M, S, variance, std
+    real(c_double)  :: oldM
 
-    ! ==========================================================================
-    ! Z-Score Normalization
-    ! ==========================================================================
-    subroutine hpcs_zscore(input, n, output) bind(C, name="hpcs_zscore")
-        integer(c_size_t), intent(in), value :: n
-        real(c_double), intent(in) :: input(n)
-        real(c_double), intent(out) :: output(n)
+    n_eff = n
 
-        real(c_double) :: mean_val, std_val, variance
-        integer(c_size_t) :: i
+    if (n_eff < 0_c_int) then
+       status = HPCS_ERR_INVALID_ARGS
+       return
+    end if
 
-        ! Calculate mean
-        mean_val = sum(input) / real(n, c_double)
+    if (n_eff == 0_c_int) then
+       ! Empty input: nothing to do, consider it "success"
+       status = HPCS_SUCCESS
+       return
+    end if
 
-        ! Calculate standard deviation
-        variance = 0.0_c_double
-        do i = 1, n
-            variance = variance + (input(i) - mean_val)**2
-        end do
-        variance = variance / real(n, c_double)
-        std_val = sqrt(variance)
+    ! First pass: Welford's method for mean and variance
+    M = 0.0_c_double
+    S = 0.0_c_double
 
-        ! Normalize
-        if (std_val > 0.0_c_double) then
-            do i = 1, n
-                output(i) = (input(i) - mean_val) / std_val
-            end do
-        else
-            output = 0.0_c_double
-        end if
-    end subroutine hpcs_zscore
+    do i = 1_c_int, n_eff
+       oldM = M
+       M = M + (x(i) - M) / real(i, kind=c_double)
+       S = S + (x(i) - M) * (x(i) - oldM)
+    end do
 
-    ! ==========================================================================
-    ! Rank Transformation
-    ! ==========================================================================
-    subroutine hpcs_rank(input, n, output) bind(C, name="hpcs_rank")
-        integer(c_size_t), intent(in), value :: n
-        real(c_double), intent(in) :: input(n)
-        real(c_double), intent(out) :: output(n)
+    mean = M
+    variance = S / real(n_eff, kind=c_double)
+    if (variance < 0.0_c_double) variance = 0.0_c_double
+    std = sqrt(variance)
 
-        integer(c_size_t) :: i, j
+    if (std == 0.0_c_double) then
+       ! All values identical (or numerically zero variance)
+       do i = 1_c_int, n_eff
+          y(i) = 0.0_c_double
+       end do
+       status = HPCS_ERR_NUMERIC_FAIL
+       return
+    end if
 
-        ! Simple ranking (could be optimized with sorting)
-        do i = 1, n
-            output(i) = 1.0_c_double
-            do j = 1, n
-                if (input(j) < input(i)) then
-                    output(i) = output(i) + 1.0_c_double
-                end if
-            end do
-        end do
-    end subroutine hpcs_rank
+    ! Second pass: z-scores
+    do i = 1_c_int, n_eff
+       y(i) = (x(i) - mean) / std
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_zscore
 
 end module hpcs_core_1d

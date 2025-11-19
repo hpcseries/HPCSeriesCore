@@ -36,8 +36,10 @@ endif()
 
 # Core library target
 add_library(hpcs_core STATIC
+    src/fortran/hpcs_constants.f90
     src/fortran/hpcs_core_1d.f90
     src/fortran/hpcs_core_reductions.f90
+    src/fortran/hpcs_core_utils.f90
 )
 
 target_include_directories(hpcs_core PUBLIC

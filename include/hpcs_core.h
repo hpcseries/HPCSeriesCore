@@ -1,13 +1,3 @@
-/**
- * @file hpcs_core.h
- * @brief HPC Series Core Library - C API
- *
- * High-performance computational kernels for time series analysis
- * and statistical operations. Implemented in Fortran with C interoperability.
- *
- * @version 0.1.0
- */
-
 #ifndef HPCS_CORE_H
 #define HPCS_CORE_H
 
@@ -15,136 +5,164 @@
 extern "C" {
 #endif
 
-#include <stddef.h>
-
-/* =============================================================================
- * Rolling Window Operations (1D)
- * ============================================================================= */
-
-/**
- * @brief Compute rolling mean over a sliding window
- * @param input Input array
- * @param n Array length
- * @param window Window size
- * @param output Output array (same size as input)
+/*
+ * HPCSeries Core v0.1 – C Interface
+ *
+ * All kernels operate on 1D contiguous arrays of double.
+ * - Arrays are passed as raw pointers.
+ * - Lengths and group IDs are 32-bit ints (matching Fortran c_int).
+ * - Kernels return an int status code:
+ *
+ *   0  = success
+ *   1  = invalid arguments (e.g., n <= 0, window <= 0, n_groups <= 0)
+ *   2  = numeric failure (e.g., zero std-dev in z-score)
+ *  >=100 reserved for future use.
  */
-void hpcs_rolling_mean(const double* input, size_t n, size_t window, double* output);
 
-/**
- * @brief Compute rolling standard deviation
- * @param input Input array
- * @param n Array length
- * @param window Window size
- * @param output Output array
+/* Status code constants (optional convenience macros) */
+#define HPCS_STATUS_SUCCESS        0
+#define HPCS_STATUS_INVALID_ARGS   1
+#define HPCS_STATUS_NUMERIC_FAIL   2
+
+/* ------------------------- Rolling operations (1D) ------------------------- */
+
+/*
+ * Rolling sum over x[0..n-1] with window length `window`.
+ *
+ * Inputs:
+ *   x      - pointer to input array (length >= n)
+ *   n      - number of elements
+ *   window - window length (> 0)
+ *
+ * Output:
+ *   y      - pointer to output array (length >= n)
+ *
+ * Returns:
+ *   int status code (0 on success).
+ *
+ * For i < window, the sum is over the truncated prefix.
  */
-void hpcs_rolling_std(const double* input, size_t n, size_t window, double* output);
+int hpcs_rolling_sum(const double *x, int n, int window, double *y);
 
-/**
- * @brief Compute rolling minimum
- * @param input Input array
- * @param n Array length
- * @param window Window size
- * @param output Output array
+/*
+ * Rolling mean over x[0..n-1] with window length `window`.
+ * Same semantics as hpcs_rolling_sum, but divides by the
+ * effective window length (min(i+1, window)) at each position.
  */
-void hpcs_rolling_min(const double* input, size_t n, size_t window, double* output);
+int hpcs_rolling_mean(const double *x, int n, int window, double *y);
 
-/**
- * @brief Compute rolling maximum
- * @param input Input array
- * @param n Array length
- * @param window Window size
- * @param output Output array
+/* --------------------------- Grouped reductions --------------------------- */
+
+/*
+ * Grouped sum.
+ *
+ * Inputs:
+ *   x         - input array (length >= n)
+ *   n         - number of elements
+ *   group_ids - group identifier per element (length >= n)
+ *   n_groups  - number of distinct groups (>= 0)
+ *
+ * Output:
+ *   y         - per-group sums (length >= n_groups)
+ *
+ * Notes:
+ *   - Valid group IDs are in [0, n_groups-1]; others are ignored.
+ *   - Groups with no elements remain 0.0.
  */
-void hpcs_rolling_max(const double* input, size_t n, size_t window, double* output);
+int hpcs_group_reduce_sum(const double *x,
+                          int n,
+                          const int *group_ids,
+                          int n_groups,
+                          double *y);
 
-/**
- * @brief Compute rolling sum
- * @param input Input array
- * @param n Array length
- * @param window Window size
- * @param output Output array
+/*
+ * Grouped mean.
+ *
+ * Same inputs as hpcs_group_reduce_sum.
+ *
+ * Output:
+ *   y - per-group means (length >= n_groups)
+ *
+ * Notes:
+ *   - Groups with no elements produce NaN (implementation-defined NaN).
  */
-void hpcs_rolling_sum(const double* input, size_t n, size_t window, double* output);
+int hpcs_group_reduce_mean(const double *x,
+                           int n,
+                           const int *group_ids,
+                           int n_groups,
+                           double *y);
 
-/* =============================================================================
- * Statistical Transformations
- * ============================================================================= */
+/* ---------------------------- Simple reductions --------------------------- */
 
-/**
- * @brief Compute z-score normalization
- * @param input Input array
- * @param n Array length
- * @param output Output array (normalized values)
+/*
+ * Sum of all elements in x[0..n-1].
+ *
+ * Input:
+ *   x  - input array (length >= n)
+ *   n  - number of elements
+ *
+ * Output:
+ *   out - pointer to scalar result
  */
-void hpcs_zscore(const double* input, size_t n, double* output);
+int hpcs_reduce_sum(const double *x, int n, double *out);
 
-/**
- * @brief Compute rank transformation
- * @param input Input array
- * @param n Array length
- * @param output Output array (ranks)
+/*
+ * Minimum of all elements in x[0..n-1].
+ *
+ * For n <= 0, returns a +inf sentinel (implementation-defined)
+ * and may set a non-zero status code.
  */
-void hpcs_rank(const double* input, size_t n, double* output);
+int hpcs_reduce_min(const double *x, int n, double *out);
 
-/* =============================================================================
- * Reductions
- * ============================================================================= */
-
-/**
- * @brief Compute simple mean
- * @param input Input array
- * @param n Array length
- * @return Mean value
+/*
+ * Maximum of all elements in x[0..n-1].
+ *
+ * For n <= 0, returns a -inf sentinel (implementation-defined)
+ * and may set a non-zero status code.
  */
-double hpcs_mean(const double* input, size_t n);
+int hpcs_reduce_max(const double *x, int n, double *out);
 
-/**
- * @brief Compute simple sum
- * @param input Input array
- * @param n Array length
- * @return Sum value
+/* --------------------------- Statistical transforms ----------------------- */
+
+/*
+ * Z-score transform:
+ *
+ *   y[i] = (x[i] - mean(x)) / std(x)
+ *
+ * Inputs:
+ *   x - input array (length >= n)
+ *   n - number of elements
+ *
+ * Output:
+ *   y - output array (length >= n)
+ *
+ * Notes:
+ *   - If std == 0, status = HPCS_STATUS_NUMERIC_FAIL (2) and implementation
+ *     may set all y[i] = 0.0.
  */
-double hpcs_sum(const double* input, size_t n);
+int hpcs_zscore(const double *x, int n, double *y);
 
-/**
- * @brief Compute standard deviation
- * @param input Input array
- * @param n Array length
- * @return Standard deviation
+/* ----------------------------- Array utilities ---------------------------- */
+
+/*
+ * In-place fill: x[i] = value for i=0..n-1.
+ *
+ * This routine does not return a status code (always succeeds
+ * for valid pointers and n >= 0).
  */
-double hpcs_std(const double* input, size_t n);
+void hpcs_fill_value(double *x, int n, double value);
 
-/**
- * @brief Group-based mean reduction
- * @param input Input array
- * @param n Array length
- * @param groups Group labels (integer array)
- * @param num_groups Number of unique groups
- * @param output Output array (size = num_groups)
+/*
+ * Copy array: y[i] = x[i] for i=0..n-1.
+ *
+ * Inputs:
+ *   x - source array (length >= n)
+ *   n - number of elements
+ *
+ * Output:
+ *   y - destination array (length >= n)
  */
-void hpcs_groupby_mean(const double* input, size_t n,
-                       const int* groups, size_t num_groups, double* output);
-
-/**
- * @brief Group-based sum reduction
- * @param input Input array
- * @param n Array length
- * @param groups Group labels (integer array)
- * @param num_groups Number of unique groups
- * @param output Output array (size = num_groups)
- */
-void hpcs_groupby_sum(const double* input, size_t n,
-                      const int* groups, size_t num_groups, double* output);
-
-/* =============================================================================
- * Version Information
- * ============================================================================= */
-
-/**
- * @brief Get library version string
- * @return Version string (e.g., "0.1.0")
- */
-const char* hpcs_version(void);
+void hpcs_copy(const double *x, int n, double *y);
 
 #ifdef __cplusplus
 }
