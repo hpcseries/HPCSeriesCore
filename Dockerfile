@@ -6,7 +6,7 @@ FROM ubuntu:22.04
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install build essentials and Fortran compiler
+# Install build essentials, Fortran compiler and Python with NumPy
 RUN apt-get update && apt-get install -y \
     build-essential \
     gfortran \
@@ -17,7 +17,14 @@ RUN apt-get update && apt-get install -y \
     git \
     vim \
     nano \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies. Using pip avoids pulling in unnecessary
+# packages and ensures the benchmark script can run inside the
+# container without requiring system‑wide NumPy.
+RUN pip3 install --no-cache-dir numpy
 
 # Set working directory
 WORKDIR /workspace

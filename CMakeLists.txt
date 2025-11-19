@@ -17,21 +17,21 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Compiler flags
+# Compiler flags - aggressive optimization for performance
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native -ffast-math")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native -ffast-math -fno-math-errno")
     set(CMAKE_Fortran_FLAGS_DEBUG "-g -Wall -Wextra -pedantic -fbounds-check")
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -xHost -ipo")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -xHost -fp-model fast -ipo")
     set(CMAKE_Fortran_FLAGS_DEBUG "-g -warn all -check all")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -Wall -Wextra")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native -Wall -Wextra")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -ffast-math -fno-math-errno -Wall -Wextra")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native -ffast-math -fno-math-errno -Wall -Wextra")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /W4")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /W4")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /fp:fast /W4")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /fp:fast /W4")
 endif()
 
 # Core library target
@@ -75,6 +75,7 @@ endif()
 # Option to build benchmarks
 option(BUILD_BENCHMARKS "Build benchmark suite" ON)
 if(BUILD_BENCHMARKS)
-    add_executable(bench_core bench/bench_core.cpp)
-    target_link_libraries(bench_core hpcs_core)
+    # Benchmark uses simplified C API wrappers
+    add_executable(bench_core bench/bench_core.cpp src/hpc_series.c)
+    target_include_directories(bench_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
