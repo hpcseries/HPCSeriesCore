@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  hpcs-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hpcseries-core:dev
+    container_name: hpcseries-dev
+
+    # Mount current directory to /workspace in container
+    volumes:
+      - .:/workspace
+
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+    # Set working directory
+    working_dir: /workspace
+
+    # Default command
+    command: /bin/bash
