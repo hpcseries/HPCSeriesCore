@@ -4,7 +4,9 @@
       "Bash(mkdir:*)",
       "Bash(tree:*)",
       "Bash(cut:*)",
-      "Bash(docker compose run:*)"
+      "Bash(docker compose run:*)",
+      "Bash(cd:*)",
+      "Bash(gcc:*)"
     ],
     "deny": [],
     "ask": []
