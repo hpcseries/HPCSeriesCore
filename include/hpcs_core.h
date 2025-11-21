@@ -515,6 +515,274 @@ void hpcs_rolling_mad_fast(
     int          *status
 );
 
+/* ============================================================================
+ * v0.4 GPU ACCELERATION CONTROL (Phase 1)
+ * ============================================================================
+ * GPU acceleration infrastructure for transparent hardware acceleration.
+ *
+ * Key Features:
+ * - Optional GPU use (never breaks CPU-only workflows)
+ * - Portable backend strategy (OpenMP target, CUDA, HIP)
+ * - Automatic CPU fallback for small workloads
+ * - Device detection and selection
+ *
+ * Acceleration Policies:
+ *   HPCS_CPU_ONLY (0)       - Never use GPU, always execute on CPU
+ *   HPCS_GPU_PREFERRED (1)  - Use GPU for large workloads, fallback to CPU (default)
+ *   HPCS_GPU_ONLY (2)       - Only use GPU, fail if unavailable (status=2)
+ *
+ * Typical Usage:
+ *   int count, status;
+ *   hpcs_get_device_count(&count, &status);
+ *   if (count > 0) {
+ *       hpcs_set_device(0, &status);  // Select first GPU
+ *       hpcs_set_accel_policy(HPCS_GPU_PREFERRED, &status);
+ *   }
+ *
+ * Note: CPU-only builds expose these APIs but report 0 devices.
+ * ========================================================================== */
+
+/* ----------------------------------------------------------------------------
+ * G. GPU Control APIs (v0.4 Phase 1)
+ * -------------------------------------------------------------------------- */
+
+/* Acceleration policy constants */
+#define HPCS_CPU_ONLY       0
+#define HPCS_GPU_PREFERRED  1
+#define HPCS_GPU_ONLY       2
+
+/* Set acceleration policy for GPU kernel execution
+ *
+ * Parameters:
+ *   policy - HPCS_CPU_ONLY, HPCS_GPU_PREFERRED, or HPCS_GPU_ONLY
+ *   status - 0=success, 1=invalid policy
+ *
+ * Thread Safety: Set once during initialization, not concurrently */
+void hpcs_set_accel_policy(
+    int  policy,
+    int *status
+);
+
+/* Get current acceleration policy
+ *
+ * Parameters:
+ *   policy - Output: current policy (0, 1, or 2)
+ *   status - 0=success */
+void hpcs_get_accel_policy(
+    int *policy,
+    int *status
+);
+
+/* Query number of available GPU devices
+ *
+ * Returns 0 for CPU-only builds or when no GPU hardware is available.
+ * Uses OpenMP target, CUDA, or HIP runtime depending on compile flags.
+ *
+ * Parameters:
+ *   count  - Output: number of GPU devices (0 if none)
+ *   status - 0=success, 2=runtime error
+ *
+ * Performance: O(1) - Single runtime query, result cached */
+void hpcs_get_device_count(
+    int *count,
+    int *status
+);
+
+/* Select a specific GPU device for kernel execution
+ *
+ * Device IDs are 0-indexed. Must be in range [0, count-1].
+ * CPU-only builds only accept device_id=0.
+ *
+ * Parameters:
+ *   device_id - Device to select (0 to count-1)
+ *   status    - 0=success, 1=invalid device_id, 2=runtime error
+ *
+ * Thread Safety: Set once during initialization or use per-thread management */
+void hpcs_set_device(
+    int  device_id,
+    int *status
+);
+
+/* Get currently selected GPU device ID
+ *
+ * Parameters:
+ *   device_id - Output: current device ID (default=0)
+ *   status    - 0=success */
+void hpcs_get_device(
+    int *device_id,
+    int *status
+);
+
+/* ----------------------------------------------------------------------------
+ * H. GPU Acceleration Internal APIs (v0.4 Phase 2)
+ * --------------------------------------------------------------------------
+ *
+ * These functions provide low-level GPU acceleration infrastructure.
+ * Most users should use the standard kernel APIs (hpcs_median, hpcs_mad, etc.)
+ * which automatically dispatch to GPU when beneficial.
+ *
+ * Phase 2 Scope:
+ *   - Backend initialization
+ *   - Memory management (host-device transfers)
+ *   - HIGH PRIORITY kernel wrappers (median, MAD, rolling_median)
+ *   - Example reduction wrapper (reduce_sum)
+ *
+ * CPU-Only Behavior:
+ *   - All functions succeed and delegate to CPU implementations
+ *   - Memory copies are no-ops (device_ptr = host_ptr)
+ * -------------------------------------------------------------------------- */
+
+/* Initialize GPU backend for accelerated execution
+ *
+ * Must be called before any GPU kernel execution.
+ * Idempotent: Multiple calls are safe (returns immediately if already initialized).
+ *
+ * Parameters:
+ *   status - 0=success (backend ready or CPU-only), 2=runtime error
+ *
+ * Thread Safety: Call once during program initialization */
+void hpcs_accel_init(
+    int *status
+);
+
+/* Copy data from host to device memory
+ *
+ * Allocates device memory and copies data from host array to device.
+ * CPU-only builds: Returns device_ptr = host_ptr (no actual copy).
+ *
+ * Parameters:
+ *   host_ptr   - Source data on host
+ *   n          - Number of elements
+ *   device_ptr - Output: pointer to device memory
+ *   status     - 0=success, 1=invalid args, 2=allocation/copy failed */
+void hpcs_accel_copy_to_device(
+    const double *host_ptr,
+    int           n,
+    void        **device_ptr,
+    int          *status
+);
+
+/* Copy data from device to host memory
+ *
+ * Copies data from device array back to host.
+ * CPU-only builds: No-op (data already on host).
+ *
+ * Parameters:
+ *   device_ptr - Source data on device
+ *   n          - Number of elements
+ *   host_ptr   - Output: destination on host
+ *   status     - 0=success, 1=invalid args, 2=copy failed */
+void hpcs_accel_copy_from_device(
+    const void   *device_ptr,
+    int           n,
+    double       *host_ptr,
+    int          *status
+);
+
+/* Free device memory allocated by hpcs_accel_copy_to_device
+ *
+ * Deallocates device memory and removes allocation from tracking table.
+ * Must be called for all allocations to prevent memory leaks.
+ * CPU-only builds: No-op (memory managed by caller).
+ *
+ * Parameters:
+ *   device_ptr - Device memory pointer to free
+ *   status     - 0=success, 1=invalid args, 2=not found */
+void hpcs_accel_free_device(
+    void *device_ptr,
+    int  *status
+);
+
+/* GPU-accelerated median computation (HIGH PRIORITY)
+ *
+ * Computes median of array on device.
+ * Phase 2: Falls back to CPU (Phase 3 will add GPU kernel).
+ * Benchmark: 366ms for 5M elements on CPU (18x slower than reductions).
+ *
+ * Parameters:
+ *   device_ptr - Input array on device
+ *   n          - Number of elements
+ *   median_val - Output: median value
+ *   status     - 0=success, 1=invalid args */
+void hpcs_accel_median(
+    const void *device_ptr,
+    int         n,
+    double     *median_val,
+    int        *status
+);
+
+/* GPU-accelerated MAD computation (HIGH PRIORITY)
+ *
+ * Computes Median Absolute Deviation on device.
+ * Phase 2: Falls back to CPU (Phase 3 will add GPU kernel).
+ * Benchmark: Similar performance to median (slow on CPU).
+ *
+ * Parameters:
+ *   device_ptr - Input array on device
+ *   n          - Number of elements
+ *   mad_val    - Output: MAD value
+ *   status     - 0=success, 1=invalid args */
+void hpcs_accel_mad(
+    const void *device_ptr,
+    int         n,
+    double     *mad_val,
+    int        *status
+);
+
+/* GPU-accelerated rolling median (HIGH PRIORITY)
+ *
+ * Computes rolling median with specified window size.
+ * Phase 2: Falls back to CPU (Phase 3 will add GPU kernel).
+ * Benchmark: 8.6s for 1M elements with window=200 (VERY EXPENSIVE).
+ *
+ * Parameters:
+ *   device_ptr    - Input array on device
+ *   n             - Number of elements
+ *   window        - Window size
+ *   device_output - Output: pointer to result array on device
+ *   status        - 0=success, 1=invalid args */
+void hpcs_accel_rolling_median(
+    const void *device_ptr,
+    int         n,
+    int         window,
+    void      **device_output,
+    int        *status
+);
+
+/* GPU-accelerated reduction sum (example wrapper)
+ *
+ * Computes sum of array on device.
+ * Included for spec compliance - reductions are already fast on CPU (20ms for 5M).
+ *
+ * Parameters:
+ *   device_ptr - Input array on device
+ *   n          - Number of elements
+ *   result     - Output: sum value
+ *   status     - 0=success, 1=invalid args */
+void hpcs_accel_reduce_sum(
+    const void *device_ptr,
+    int         n,
+    double     *result,
+    int        *status
+);
+
+/* GPU-accelerated prefix sum (inclusive scan)
+ *
+ * Computes inclusive prefix sum of array on device.
+ * Uses Blelloch scan algorithm for efficient parallel computation.
+ *
+ * Parameters:
+ *   device_input_ptr  - Input array on device
+ *   n                 - Number of elements
+ *   device_output_ptr - Output array on device (prefix sum)
+ *   status            - 0=success, 1=invalid args */
+void hpcs_accel_prefix_sum(
+    const void *device_input_ptr,
+    int         n,
+    void       *device_output_ptr,
+    int        *status
+);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,13 +1,54 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(HPCSeriesCore
-    VERSION 0.3.0
+    VERSION 0.4.0
     DESCRIPTION "High-Performance Computing Series Core Library"
     LANGUAGES C CXX Fortran
 )
 
 # Find OpenMP (required for parallel kernels)
 find_package(OpenMP REQUIRED)
+
+# ============================================================================
+# v0.4 GPU Acceleration Options (Phase 1)
+# ============================================================================
+# Optional GPU acceleration support via portable backends.
+# GPU use is transparent and never breaks CPU-only workflows.
+#
+# Build Options:
+#   -DHPCS_ENABLE_GPU_OPENMP=ON   : Enable OpenMP target offloading (default: OFF)
+#   -DHPCS_ENABLE_GPU_CUDA=ON     : Enable CUDA backend (default: OFF)
+#   -DHPCS_ENABLE_GPU_HIP=ON      : Enable HIP/ROCm backend (default: OFF)
+#
+# Note: Currently only OpenMP target is implemented. CUDA/HIP support
+#       requires additional runtime bindings (future phases).
+#
+# Example: cmake -DHPCS_ENABLE_GPU_OPENMP=ON ..
+# ============================================================================
+
+option(HPCS_ENABLE_GPU_OPENMP "Enable GPU acceleration via OpenMP target offloading" OFF)
+option(HPCS_ENABLE_GPU_CUDA "Enable GPU acceleration via CUDA (not yet implemented)" OFF)
+option(HPCS_ENABLE_GPU_HIP "Enable GPU acceleration via HIP/ROCm (not yet implemented)" OFF)
+
+# Configure GPU backend flags
+if(HPCS_ENABLE_GPU_OPENMP)
+    message(STATUS "HPCSeries: GPU acceleration enabled (OpenMP target offloading)")
+    add_compile_definitions(HPCS_USE_OPENMP_TARGET)
+    # Add OpenMP target offload flags for supported compilers
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -foffload=nvptx-none")
+    elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fiopenmp -fopenmp-targets=spir64")
+    endif()
+elseif(HPCS_ENABLE_GPU_CUDA)
+    message(WARNING "HPCSeries: CUDA backend not yet implemented (Phase 1). Falling back to CPU-only.")
+    # Future: add CUDA runtime bindings
+elseif(HPCS_ENABLE_GPU_HIP)
+    message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
+    # Future: add HIP runtime bindings
+else()
+    message(STATUS "HPCSeries: CPU-only build (GPU acceleration disabled)")
+endif()
 
 # Set C++ and C standards
 set(CMAKE_CXX_STANDARD 17)
@@ -56,6 +97,8 @@ add_library(hpcs_core STATIC
     src/fortran/hpcs_core_quality_parallel.f90
     # v0.3 fast rolling operations (C++ heap-based)
     src/hpcs_rolling_fast.cpp
+    # v0.4 GPU acceleration infrastructure (Phase 1)
+    src/fortran/hpcs_core_accel.f90
 )
 
 target_include_directories(hpcs_core PUBLIC
@@ -97,6 +140,16 @@ if(BUILD_TESTS)
     add_executable(test_robust_anomalies tests/test_robust_anomalies.c)
     target_link_libraries(test_robust_anomalies hpcs_core)
     add_test(NAME test_robust_anomalies COMMAND test_robust_anomalies)
+
+    # GPU infrastructure tests (v0.4 Phase 1)
+    add_executable(test_gpu_infrastructure tests/test_gpu_infrastructure.c)
+    target_link_libraries(test_gpu_infrastructure hpcs_core)
+    add_test(NAME test_gpu_infrastructure COMMAND test_gpu_infrastructure)
+
+    # Phase 2 acceleration tests (v0.4 Phase 2)
+    add_executable(test_phase2_accel tests/test_phase2_accel.c)
+    target_link_libraries(test_phase2_accel hpcs_core)
+    add_test(NAME test_phase2_accel COMMAND test_phase2_accel)
 endif()
 
 # Option to build benchmarks

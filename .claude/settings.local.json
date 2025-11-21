@@ -12,7 +12,9 @@
       "Bash(cmake:*)",
       "Bash(./bench_anomaly_detection:*)",
       "Bash(tee:*)",
-      "Bash(benchmark_results_raw.txt)"
+      "Bash(benchmark_results_raw.txt)",
+      "Bash(make test_phase2_accel:*)",
+      "Bash(./test_phase2_accel:*)"
     ],
     "deny": [],
     "ask": []
