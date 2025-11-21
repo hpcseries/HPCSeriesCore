@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(HPCSeriesCore
-    VERSION 0.2.0
+    VERSION 0.3.0
     DESCRIPTION "High-Performance Computing Series Core Library"
     LANGUAGES C CXX Fortran
 )
@@ -40,20 +40,33 @@ endif()
 
 # Core library target
 add_library(hpcs_core STATIC
+    # v0.1/v0.2 modules (maintained for backward compatibility)
     src/fortran/hpcs_constants.f90
     src/fortran/hpcs_core_1d.f90
     src/fortran/hpcs_core_reductions.f90
     src/fortran/hpcs_core_utils.f90
     src/fortran/hpcs_core_prefix.f90
     src/fortran/hpcs_core_parallel.f90
+    # v0.3 modules (robust statistics & data quality)
+    src/fortran/hpcs_core_stats.f90
+    src/fortran/hpcs_core_rolling.f90
+    src/fortran/hpcs_core_quality.f90
+    # v0.3 parallel modules (OpenMP optimized)
+    src/fortran/hpcs_core_stats_parallel.f90
+    src/fortran/hpcs_core_quality_parallel.f90
+    # v0.3 fast rolling operations (C++ heap-based)
+    src/hpcs_rolling_fast.cpp
 )
 
 target_include_directories(hpcs_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# Link OpenMP to the library
+# Link OpenMP and C++ stdlib to the library
 target_link_libraries(hpcs_core PUBLIC OpenMP::OpenMP_Fortran)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_link_libraries(hpcs_core PUBLIC stdc++)
+endif()
 
 # Installation rules
 install(TARGETS hpcs_core
@@ -79,12 +92,32 @@ if(BUILD_TESTS)
     add_executable(test_core_cpp tests/test_core_cpp.cpp)
     target_link_libraries(test_core_cpp hpcs_core)
     add_test(NAME test_core_cpp COMMAND test_core_cpp)
+
+    # Robust anomaly detection tests (v0.3+)
+    add_executable(test_robust_anomalies tests/test_robust_anomalies.c)
+    target_link_libraries(test_robust_anomalies hpcs_core)
+    add_test(NAME test_robust_anomalies COMMAND test_robust_anomalies)
 endif()
 
 # Option to build benchmarks
 option(BUILD_BENCHMARKS "Build benchmark suite" ON)
 if(BUILD_BENCHMARKS)
-    # Benchmark uses simplified C API wrappers
+    # v0.1/v0.2 benchmark uses simplified C API wrappers
     add_executable(bench_core bench/bench_core.cpp src/hpc_series.c)
     target_include_directories(bench_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # v0.3 benchmark for robust statistics
+    add_executable(bench_v03 bench/bench_v03.cpp)
+    target_link_libraries(bench_v03 hpcs_core)
+    target_include_directories(bench_v03 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # v0.3 optimized benchmark (original vs parallel/fast)
+    add_executable(bench_v03_optimized bench/bench_v03_optimized.cpp)
+    target_link_libraries(bench_v03_optimized hpcs_core)
+    target_include_directories(bench_v03_optimized PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # Anomaly detection benchmark (classical vs robust vs rolling)
+    add_executable(bench_anomaly_detection bench/bench_anomaly_detection.cpp)
+    target_link_libraries(bench_anomaly_detection hpcs_core)
+    target_include_directories(bench_anomaly_detection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()

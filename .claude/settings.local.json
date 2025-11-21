@@ -6,7 +6,13 @@
       "Bash(cut:*)",
       "Bash(docker compose run:*)",
       "Bash(cd:*)",
-      "Bash(gcc:*)"
+      "Bash(gcc:*)",
+      "Bash(make clean:*)",
+      "Bash(make)",
+      "Bash(cmake:*)",
+      "Bash(./bench_anomaly_detection:*)",
+      "Bash(tee:*)",
+      "Bash(benchmark_results_raw.txt)"
     ],
     "deny": [],
     "ask": []

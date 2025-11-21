@@ -629,7 +629,6 @@ contains
   subroutine hpcs_group_reduce_variance_parallel(x, n, group_ids, n_groups, y, status) &
        bind(C, name="hpcs_group_reduce_variance_parallel")
     use iso_c_binding, only: c_int, c_double
-    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none
 
     real(c_double), intent(in)  :: x(*)
@@ -639,83 +638,29 @@ contains
     real(c_double), intent(out) :: y(*)
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: i, g, n_eff, ng_eff
-    real(c_double), allocatable :: group_mean(:), group_m2(:)
-    integer(c_int), allocatable :: group_count(:)
-    real(c_double) :: nan_val
+    ! CRITICAL FIX: Always delegate to serial version
+    !
+    ! Benchmarking revealed that the parallel implementation with atomic operations
+    ! is 5-10x SLOWER than the serial version due to severe atomic contention.
+    ! Multiple threads competing to update the same group buckets causes serialization
+    ! that negates any parallel benefit and adds significant overhead.
+    !
+    ! Benchmark results (4 threads):
+    !   Array Size  | Serial (ms) | Parallel (ms) | Speedup
+    !   ------------|-------------|---------------|--------
+    !   100K        |   0.708     |   4.925       | 0.14x
+    !   500K        |   3.499     |  38.922       | 0.09x
+    !   1M          |   8.078     |  41.056       | 0.20x
+    !   10M         |  55.485     | 350.309       | 0.16x
+    !
+    ! This function is retained for API compatibility but internally uses the
+    ! serial implementation which is significantly faster. Alternative parallel
+    ! strategies (thread-private arrays, block partitioning) may be explored
+    ! in future versions.
+    !
+    ! See: BENCHMARK_RESULTS_SUMMARY.md for detailed analysis
 
-    n_eff  = n
-    ng_eff = n_groups
-
-    if (n_eff < 0_c_int .or. ng_eff <= 0_c_int) then
-       status = HPCS_ERR_INVALID_ARGS
-       return
-    end if
-
-    if (n_eff == 0_c_int) then
-       status = HPCS_SUCCESS
-       return
-    end if
-
-    ! Fall back to serial for small arrays
-    if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_group_reduce_variance(x, n, group_ids, n_groups, y, status)
-       return
-    end if
-
-    nan_val = ieee_value(0.0_c_double, ieee_quiet_nan)
-
-    ! Allocate accumulators
-    allocate(group_mean(ng_eff), group_m2(ng_eff), group_count(ng_eff))
-    group_mean = 0.0_c_double
-    group_m2 = 0.0_c_double
-    group_count = 0_c_int
-
-    ! Two-pass algorithm for parallel grouped variance
-    ! Pass 1: Compute group sums and counts (parallel with atomic updates)
-!$omp parallel do default(none) shared(x, group_ids, n_eff, ng_eff, group_mean, group_count) private(i, g)
-    do i = 1_c_int, n_eff
-       g = group_ids(i)
-       if (g >= 0_c_int .and. g < ng_eff) then
-          g = g + 1_c_int  ! Convert to 1-based
-!$omp atomic
-          group_mean(g) = group_mean(g) + x(i)
-!$omp atomic
-          group_count(g) = group_count(g) + 1_c_int
-       end if
-    end do
-!$omp end parallel do
-
-    ! Compute means
-    do g = 1_c_int, ng_eff
-       if (group_count(g) > 0_c_int) then
-          group_mean(g) = group_mean(g) / real(group_count(g), kind=c_double)
-       end if
-    end do
-
-    ! Pass 2: Compute sum of squared deviations (parallel with atomic updates)
-!$omp parallel do default(none) shared(x, group_ids, n_eff, ng_eff, group_mean, group_m2) private(i, g)
-    do i = 1_c_int, n_eff
-       g = group_ids(i)
-       if (g >= 0_c_int .and. g < ng_eff) then
-          g = g + 1_c_int  ! Convert to 1-based
-!$omp atomic
-          group_m2(g) = group_m2(g) + (x(i) - group_mean(g)) * (x(i) - group_mean(g))
-       end if
-    end do
-!$omp end parallel do
-
-    ! Compute variances
-    do g = 1_c_int, ng_eff
-       if (group_count(g) > 0_c_int) then
-          y(g) = group_m2(g) / real(group_count(g), kind=c_double)
-       else
-          y(g) = nan_val
-       end if
-    end do
-
-    deallocate(group_mean, group_m2, group_count)
-    status = HPCS_SUCCESS
+    call hpcs_group_reduce_variance(x, n, group_ids, n_groups, y, status)
   end subroutine hpcs_group_reduce_variance_parallel
 
 end module hpcs_core_parallel
