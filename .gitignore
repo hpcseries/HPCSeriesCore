@@ -44,3 +44,6 @@ logs/tests/**/*.log
 !logs/reports/*.md
 !logs/reports/**/*.md
 !logs/README.md
+
+*.md
+*.pdf
