@@ -14,7 +14,10 @@
       "Bash(tee:*)",
       "Bash(benchmark_results_raw.txt)",
       "Bash(make test_phase2_accel:*)",
-      "Bash(./test_phase2_accel:*)"
+      "Bash(./test_phase2_accel:*)",
+      "Bash(echo:*)",
+      "Bash(chmod:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

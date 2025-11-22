@@ -33,6 +33,14 @@ Makefile
 Thumbs.db
 
 # Test outputs
-*.log
 test_results/
 docs/*
+
+# Logs (exclude runtime logs, keep reports)
+logs/benchmarks/*.csv
+logs/benchmarks/**/*.csv
+logs/tests/*.log
+logs/tests/**/*.log
+!logs/reports/*.md
+!logs/reports/**/*.md
+!logs/README.md

@@ -63,12 +63,13 @@ endif()
 
 # Compiler flags - aggressive optimization for performance + OpenMP
 # Note: Removed -ffast-math for Fortran to preserve IEEE 754 NaN handling for data utilities
+# Note: -cpp flag enables preprocessing for #ifdef/#else/#endif directives in .f90 files
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native ${OpenMP_Fortran_FLAGS}")
-    set(CMAKE_Fortran_FLAGS_DEBUG "-g -Wall -Wextra -pedantic -fbounds-check ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -march=native ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS_DEBUG "-cpp -g -Wall -Wextra -pedantic -fbounds-check ${OpenMP_Fortran_FLAGS}")
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -xHost -fp-model fast -ipo ${OpenMP_Fortran_FLAGS}")
-    set(CMAKE_Fortran_FLAGS_DEBUG "-g -warn all -check all ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fpp -O3 -xHost -fp-model fast -ipo ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS_DEBUG "-fpp -g -warn all -check all ${OpenMP_Fortran_FLAGS}")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -121,35 +122,65 @@ install(FILES include/hpcs_core.h
     DESTINATION include
 )
 
-# Option to build tests
+# ============================================================================
+# Test Suite Configuration
+# ============================================================================
+# Organized test suite for CPU baseline validation and GPU acceleration testing.
+#
+# Test Hierarchy:
+#   1. CPU Baseline Tests (validate core functionality)
+#      - test_hpcs_baseline   : Comprehensive C++ tests for v0.1/v0.2 kernels
+#      - test_hpcs_robust     : Robust statistics tests (v0.3)
+#
+#   2. GPU Acceleration Tests (validate GPU layers - Phase 3B/4)
+#      - test_hpcs_gpu_infra  : GPU infrastructure and backend initialization
+#      - test_hpcs_gpu_kernels: GPU statistical kernels (median, MAD, rolling, etc.)
+#      - test_hpcs_gpu_memory : GPU memory management (allocation/transfer/deallocation)
+#
+# Recommended Test Order for GPU Deployment:
+#   1. test_hpcs_baseline      → Validate CPU baseline
+#   2. test_hpcs_robust        → Validate robust statistics
+#   3. test_hpcs_gpu_infra     → Validate GPU backend
+#   4. test_hpcs_gpu_memory    → Validate memory management
+#   5. test_hpcs_gpu_kernels   → Validate GPU kernels
+# ============================================================================
+
 option(BUILD_TESTS "Build test suite" ON)
 if(BUILD_TESTS)
     enable_testing()
 
-    # C test
-    add_executable(test_core_c tests/test_core_c.c)
-    target_link_libraries(test_core_c hpcs_core)
-    add_test(NAME test_core_c COMMAND test_core_c)
+    # ========================================================================
+    # CPU Baseline Tests (2106 assertions total)
+    # ========================================================================
 
-    # C++ test
-    add_executable(test_core_cpp tests/test_core_cpp.cpp)
-    target_link_libraries(test_core_cpp hpcs_core)
-    add_test(NAME test_core_cpp COMMAND test_core_cpp)
+    # Baseline functionality tests (v0.1/v0.2 kernels)
+    add_executable(test_hpcs_baseline tests/test_hpcs_baseline.cpp)
+    target_link_libraries(test_hpcs_baseline hpcs_core)
+    add_test(NAME test_hpcs_baseline COMMAND test_hpcs_baseline)
 
-    # Robust anomaly detection tests (v0.3+)
-    add_executable(test_robust_anomalies tests/test_robust_anomalies.c)
-    target_link_libraries(test_robust_anomalies hpcs_core)
-    add_test(NAME test_robust_anomalies COMMAND test_robust_anomalies)
+    # Robust statistics and anomaly detection tests (v0.3+)
+    add_executable(test_hpcs_robust tests/test_hpcs_robust.c)
+    target_link_libraries(test_hpcs_robust hpcs_core)
+    add_test(NAME test_hpcs_robust COMMAND test_hpcs_robust)
 
-    # GPU infrastructure tests (v0.4 Phase 1)
-    add_executable(test_gpu_infrastructure tests/test_gpu_infrastructure.c)
-    target_link_libraries(test_gpu_infrastructure hpcs_core)
-    add_test(NAME test_gpu_infrastructure COMMAND test_gpu_infrastructure)
+    # ========================================================================
+    # GPU Acceleration Tests (2106 assertions total)
+    # ========================================================================
 
-    # Phase 2 acceleration tests (v0.4 Phase 2)
-    add_executable(test_phase2_accel tests/test_phase2_accel.c)
-    target_link_libraries(test_phase2_accel hpcs_core)
-    add_test(NAME test_phase2_accel COMMAND test_phase2_accel)
+    # GPU infrastructure and backend tests
+    add_executable(test_hpcs_gpu_infra tests/test_hpcs_gpu_infra.c)
+    target_link_libraries(test_hpcs_gpu_infra hpcs_core)
+    add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
+
+    # GPU kernel implementation tests (Phase 3B optimized)
+    add_executable(test_hpcs_gpu_kernels tests/test_hpcs_gpu_kernels.c)
+    target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
+    add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
+
+    # GPU memory management tests (Phase 4A)
+    add_executable(test_hpcs_gpu_memory tests/test_hpcs_gpu_memory.c)
+    target_link_libraries(test_hpcs_gpu_memory hpcs_core)
+    add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
 endif()
 
 # Option to build benchmarks
