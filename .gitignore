@@ -47,3 +47,4 @@ logs/tests/**/*.log
 
 *.md
 *.pdf
+.claude/
