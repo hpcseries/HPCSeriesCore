@@ -609,6 +609,11 @@ contains
        bind(C, name="hpcs_accel_free_device")
     type(c_ptr), value :: device_ptr
     integer(c_int), intent(out) :: status
+#ifdef HPCS_USE_OPENMP_TARGET
+    real(c_double), pointer :: device_array(:)
+    integer :: i, alloc_idx
+    integer(c_int) :: alloc_size
+#endif
 
     ! Validate arguments (both GPU and CPU modes - API consistency)
     if (.not. c_associated(device_ptr)) then
@@ -617,9 +622,6 @@ contains
     end if
 
 #ifdef HPCS_USE_OPENMP_TARGET
-    real(c_double), pointer :: device_array(:)
-    integer :: i, alloc_idx
-    integer(c_int) :: alloc_size
 
     ! -----------------------------------------------------------------------
     ! Phase 4: OpenMP Target Implementation - Actual Device Memory Deallocation
