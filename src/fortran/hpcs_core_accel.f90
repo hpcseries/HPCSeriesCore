@@ -772,7 +772,6 @@ contains
       median_val = (sorted_data(n/2) + sorted_data(n/2 + 1)) / 2.0_c_double
     end if
   end function gpu_extract_median
-  !$omp end declare target
 
   !> GPU-native small bitonic sort for window processing
   !>
@@ -782,7 +781,6 @@ contains
   !> @param[inout] window_data - Small array to sort in-place
   !> @param[in] window_size - Size of window (small)
   !> @return Median of sorted window
-  !$omp declare target!$omp declare target
   function gpu_bitonic_sort_window(window_data, window_size) result(median_val)
     real(c_double), intent(inout) :: window_data(:)
     integer(c_int), intent(in) :: window_size
@@ -1035,9 +1033,7 @@ contains
     ! Memory per thread: window size × 8 bytes (typically 200 × 8 = 1.6 KB)
     ! Note: Fixed-size array used instead of BLOCK construct (NVFORTRAN limitation)
 
-    !$omp target teams distribute parallel do &
-    !$omp map(to:input_array(1:n), window) map(from:output_array(1:num_windows)) &
-    !$omp private(j, window_data)
+    !$omp target teams distribute parallel do map(to:input_array(1:n), window) map(from:output_array(1:num_windows)) private(j, window_data)
     do i = 1, num_windows
       ! Extract window (only use first 'window' elements)
       ! window_data is thread-private via OpenMP private clause
