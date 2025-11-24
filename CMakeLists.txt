@@ -47,8 +47,12 @@ elseif(HPCS_ENABLE_GPU_CUDA)
     add_compile_definitions(HPCS_USE_CUDA)
     # Configure CUDA Fortran flags when using NVHPC/PGI
     if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-        # Enable free-form, preprocessing, and CUDA GPU code for cc75 (T4)
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -Mpreprocess -cuda -gpu=cc75")
+    endif()
+    # Ensure CUDA runtime is linked into all executables
+    if(CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -cuda")
+        set(CMAKE_CXX_LINK_FLAGS   "${CMAKE_CXX_LINK_FLAGS} -cuda")
     endif()
 elseif(HPCS_ENABLE_GPU_HIP)
     message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
@@ -214,9 +218,4 @@ if(BUILD_BENCHMARKS)
     add_executable(bench_anomaly_detection bench/bench_anomaly_detection.cpp)
     target_link_libraries(bench_anomaly_detection hpcs_core)
     target_include_directories(bench_anomaly_detection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-endif()
-
-# When using the CUDA backend with NVHPC, ensure executables are linked with CUDA support
-if(HPCS_ENABLE_GPU_CUDA AND CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
-    add_link_options(-cuda)
 endif()
