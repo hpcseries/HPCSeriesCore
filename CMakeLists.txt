@@ -215,3 +215,8 @@ if(BUILD_BENCHMARKS)
     target_link_libraries(bench_anomaly_detection hpcs_core)
     target_include_directories(bench_anomaly_detection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
+
+# When using the CUDA backend with NVHPC, ensure executables are linked with CUDA support
+if(HPCS_ENABLE_GPU_CUDA AND CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
+    add_link_options(-cuda)
+endif()
