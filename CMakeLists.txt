@@ -58,6 +58,7 @@ elseif(HPCS_ENABLE_GPU_HIP)
     message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
     # Future: add HIP runtime bindings
 else()
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mpreprocess")
     message(STATUS "HPCSeries: CPU-only build (GPU acceleration disabled)")
 endif()
 
@@ -66,6 +67,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
