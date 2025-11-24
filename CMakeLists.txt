@@ -26,39 +26,48 @@ find_package(OpenMP REQUIRED)
 # Example: cmake -DHPCS_ENABLE_GPU_OPENMP=ON ..
 # ============================================================================
 
+# ============================================================================
+# v0.4 GPU Acceleration Options (Phase 1)
+# ============================================================================
+# Optional GPU acceleration support via portable backends.
+# GPU use is transparent and never breaks CPU-only workflows.
+#
+# Build Options:
+#   -DHPCS_ENABLE_GPU_OPENMP=ON   : Enable OpenMP target offloading (default: OFF)
+#   -DHPCS_ENABLE_GPU_CUDA=ON     : Enable CUDA backend (default: OFF)
+#   -DHPCS_ENABLE_GPU_HIP=ON      : Enable HIP/ROCm backend (future)
+# ============================================================================
+
 option(HPCS_ENABLE_GPU_OPENMP "Enable GPU acceleration via OpenMP target offloading" OFF)
-option(HPCS_ENABLE_GPU_CUDA "Enable GPU acceleration via CUDA (not yet implemented)" OFF)
+option(HPCS_ENABLE_GPU_CUDA "Enable GPU acceleration via CUDA" OFF)
 option(HPCS_ENABLE_GPU_HIP "Enable GPU acceleration via HIP/ROCm (not yet implemented)" OFF)
 
-# Configure GPU backend flags
+# Configure GPU backend flags (overlays on top of base compiler flags)
 if(HPCS_ENABLE_GPU_OPENMP)
     message(STATUS "HPCSeries: GPU acceleration enabled (OpenMP target offloading)")
     add_compile_definitions(HPCS_USE_OPENMP_TARGET)
-    # Add OpenMP target offload flags for supported compilers
     if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -foffload=nvptx-none")
     elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fiopenmp -fopenmp-targets=spir64")
     elseif(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -mp=gpu -gpu=cc75")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mp=gpu -gpu=cc75")
     endif()
 elseif(HPCS_ENABLE_GPU_CUDA)
     message(STATUS "HPCSeries: GPU acceleration enabled (CUDA backend via NVHPC)")
     add_compile_definitions(HPCS_USE_CUDA)
-    # Configure CUDA Fortran flags when using NVHPC/PGI
     if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        # Enable free-form, preprocessing, and CUDA GPU code for cc75 (T4)
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -Mpreprocess -cuda -gpu=cc75")
     endif()
-    # Ensure CUDA runtime is linked into all executables
     if(CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
+        # Link CUDA Fortran runtime into all executables
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -cuda")
         set(CMAKE_CXX_LINK_FLAGS   "${CMAKE_CXX_LINK_FLAGS} -cuda")
     endif()
 elseif(HPCS_ENABLE_GPU_HIP)
     message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
-    # Future: add HIP runtime bindings
 else()
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mpreprocess")
     message(STATUS "HPCSeries: CPU-only build (GPU acceleration disabled)")
 endif()
 
@@ -76,7 +85,7 @@ endif()
 
 # Compiler flags - aggressive optimization for performance + OpenMP
 # Note: Removed -ffast-math for Fortran to preserve IEEE 754 NaN handling for data utilities
-# Note: -cpp flag enables preprocessing for #ifdef/#else/#endif directives in .f90 files
+#       and ensure preprocessing works across compilers.
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -march=native ${OpenMP_Fortran_FLAGS}")
     set(CMAKE_Fortran_FLAGS_DEBUG "-cpp -g -Wall -Wextra -pedantic -fbounds-check ${OpenMP_Fortran_FLAGS}")
@@ -184,19 +193,24 @@ if(BUILD_TESTS)
     # ========================================================================
 
     # GPU infrastructure and backend tests
-    add_executable(test_hpcs_gpu_infra tests/test_hpcs_gpu_infra.c)
-    target_link_libraries(test_hpcs_gpu_infra hpcs_core)
-    add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
 
-    # GPU kernel implementation tests (Phase 3B optimized)
-    add_executable(test_hpcs_gpu_kernels tests/test_hpcs_gpu_kernels.c)
-    target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
-    add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
+    # GPU tests are only built when a GPU backend is enabled
+    if(HPCS_ENABLE_GPU_OPENMP OR HPCS_ENABLE_GPU_CUDA OR HPCS_ENABLE_GPU_HIP)
+        # GPU infrastructure and backend tests
+        add_executable(test_hpcs_gpu_infra tests/test_hpcs_gpu_infra.c)
+        target_link_libraries(test_hpcs_gpu_infra hpcs_core)
+        add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
 
-    # GPU memory management tests (Phase 4A)
-    add_executable(test_hpcs_gpu_memory tests/test_hpcs_gpu_memory.c)
-    target_link_libraries(test_hpcs_gpu_memory hpcs_core)
-    add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
+        # GPU kernel implementation tests (Phase 3B optimized)
+        add_executable(test_hpcs_gpu_kernels tests/test_hpcs_gpu_kernels.c)
+        target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
+        add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
+
+        # GPU memory management tests (Phase 4A)
+        add_executable(test_hpcs_gpu_memory tests/test_hpcs_gpu_memory.c)
+        target_link_libraries(test_hpcs_gpu_memory hpcs_core)
+        add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
+    endif()
 endif()
 
 # Option to build benchmarks
