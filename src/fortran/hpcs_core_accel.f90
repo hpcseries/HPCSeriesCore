@@ -210,11 +210,19 @@ contains
   !> Performance: O(1) - Single runtime query, cached for efficiency
   subroutine hpcs_get_device_count(count, status) &
        bind(C, name="hpcs_get_device_count")
+#ifdef HPCS_USE_CUDA
+    use cudafor
+#endif
+
     integer(c_int), intent(out) :: count
     integer(c_int), intent(out) :: status
 
 #ifdef HPCS_USE_OPENMP_TARGET
     integer(c_int) :: omp_get_num_devices
+#endif
+
+#ifdef HPCS_USE_CUDA
+    integer :: istat, num_devices
 #endif
 
     ! Initialize status
@@ -244,9 +252,6 @@ contains
     ! -----------------------------------------------------------------------
     ! Use CUDA Fortran runtime API to query device count
     ! Requires: NVIDIA GPU hardware + CUDA toolkit
-    use cudafor
-    integer :: istat, num_devices
-
     istat = cudaGetDeviceCount(num_devices)
     if (istat == cudaSuccess) then
       count = num_devices
@@ -300,9 +305,17 @@ contains
   !> initialization or use per-thread device management.
   subroutine hpcs_set_device(device_id, status) &
        bind(C, name="hpcs_set_device")
+#ifdef HPCS_USE_CUDA
+    use cudafor
+#endif
+
     integer(c_int), intent(in), value :: device_id
     integer(c_int), intent(out) :: status
     integer(c_int) :: count, st
+
+#ifdef HPCS_USE_CUDA
+    integer :: istat
+#endif
 
     ! Validate device_id by querying available devices
     call hpcs_get_device_count(count, st)
@@ -340,9 +353,6 @@ contains
     ! CUDA Backend
     ! -----------------------------------------------------------------------
     ! Use CUDA Fortran runtime API to set active device
-    use cudafor
-    integer :: istat
-
     istat = cudaSetDevice(device_id)
     if (istat == cudaSuccess) then
       current_device = device_id
