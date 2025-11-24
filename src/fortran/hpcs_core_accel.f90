@@ -758,7 +758,8 @@ contains
   !> @param[in] sorted_data - Sorted array
   !> @param[in] n - Number of elements
   !> @return Median value
-  attributes(device) function gpu_extract_median(sorted_data, n) result(median_val)
+  !$omp declare target
+  function gpu_extract_median(sorted_data, n) result(median_val)
     real(c_double), intent(in) :: sorted_data(:)
     integer(c_int), intent(in) :: n
     real(c_double) :: median_val
@@ -771,6 +772,7 @@ contains
       median_val = (sorted_data(n/2) + sorted_data(n/2 + 1)) / 2.0_c_double
     end if
   end function gpu_extract_median
+  !$omp end declare target
 
   !> GPU-native small bitonic sort for window processing
   !>
@@ -780,7 +782,8 @@ contains
   !> @param[inout] window_data - Small array to sort in-place
   !> @param[in] window_size - Size of window (small)
   !> @return Median of sorted window
-  attributes(device) function gpu_bitonic_sort_window(window_data, window_size) result(median_val)
+  !$omp declare target!$omp declare target
+  function gpu_bitonic_sort_window(window_data, window_size) result(median_val)
     real(c_double), intent(inout) :: window_data(:)
     integer(c_int), intent(in) :: window_size
     real(c_double) :: median_val
@@ -817,6 +820,7 @@ contains
       median_val = (window_data(window_size/2) + window_data(window_size/2 + 1)) / 2.0_c_double
     end if
   end function gpu_bitonic_sort_window
+  !$omp end declare target
 
   ! ========================================================================
   ! Phase 2: HIGH PRIORITY Kernel Wrappers
