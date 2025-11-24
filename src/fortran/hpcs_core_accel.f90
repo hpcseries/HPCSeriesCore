@@ -242,11 +242,21 @@ contains
     ! -----------------------------------------------------------------------
     ! CUDA Backend
     ! -----------------------------------------------------------------------
-    ! Use CUDA runtime API to query device count
+    ! Use CUDA Fortran runtime API to query device count
     ! Requires: NVIDIA GPU hardware + CUDA toolkit
-    ! Note: This requires external CUDA runtime binding (not implemented yet)
-    ! For now, fall through to CPU-only stub
-    count = 0_c_int
+    use cudafor
+    integer :: istat, num_devices
+
+    istat = cudaGetDeviceCount(num_devices)
+    if (istat == cudaSuccess) then
+      count = num_devices
+      status = HPCS_SUCCESS
+    else
+      ! GPU query failed, fall back to CPU-only mode
+      count = 0_c_int
+      status = HPCS_ERR_RUNTIME
+    end if
+
     device_count_cache = count
     device_count_initialized = .true.
 
@@ -329,11 +339,17 @@ contains
     ! -----------------------------------------------------------------------
     ! CUDA Backend
     ! -----------------------------------------------------------------------
-    ! Use cudaSetDevice(device_id)
-    ! Note: Requires external CUDA runtime binding (not implemented yet)
-    ! For now, just store the device ID
-    current_device = device_id
-    status = HPCS_SUCCESS
+    ! Use CUDA Fortran runtime API to set active device
+    use cudafor
+    integer :: istat
+
+    istat = cudaSetDevice(device_id)
+    if (istat == cudaSuccess) then
+      current_device = device_id
+      status = HPCS_SUCCESS
+    else
+      status = HPCS_ERR_RUNTIME
+    end if
 
 #elif defined(HPCS_USE_HIP)
     ! -----------------------------------------------------------------------
