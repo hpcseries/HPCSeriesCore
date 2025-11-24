@@ -259,7 +259,7 @@ contains
     else
       ! GPU query failed, fall back to CPU-only mode
       count = 0_c_int
-      status = HPCS_ERR_RUNTIME
+      status = HPCS_ERR_NUMERIC_FAIL
     end if
 
     device_count_cache = count
@@ -320,7 +320,7 @@ contains
     ! Validate device_id by querying available devices
     call hpcs_get_device_count(count, st)
     if (st /= HPCS_SUCCESS) then
-      status = HPCS_RUNTIME_ERROR
+      status = HPCS_ERR_NUMERIC_FAIL
       return
     end if
 
@@ -358,7 +358,7 @@ contains
       current_device = device_id
       status = HPCS_SUCCESS
     else
-      status = HPCS_ERR_RUNTIME
+      status = HPCS_ERR_NUMERIC_FAIL
     end if
 
 #elif defined(HPCS_USE_HIP)
