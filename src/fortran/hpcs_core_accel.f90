@@ -758,7 +758,7 @@ contains
   !> @param[in] sorted_data - Sorted array
   !> @param[in] n - Number of elements
   !> @return Median value
-  !$omp declare target
+  !$omp declare target (gpu_extract_median, gpu_bitonic_sort_window)
   function gpu_extract_median(sorted_data, n) result(median_val)
     real(c_double), intent(in) :: sorted_data(:)
     integer(c_int), intent(in) :: n
@@ -818,7 +818,7 @@ contains
       median_val = (window_data(window_size/2) + window_data(window_size/2 + 1)) / 2.0_c_double
     end if
   end function gpu_bitonic_sort_window
-  !$omp end declare target
+
 
   ! ========================================================================
   ! Phase 2: HIGH PRIORITY Kernel Wrappers
