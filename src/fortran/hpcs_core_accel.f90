@@ -210,84 +210,34 @@ contains
   !> Performance: O(1) - Single runtime query, cached for efficiency
   subroutine hpcs_get_device_count(count, status) &
        bind(C, name="hpcs_get_device_count")
-#ifdef HPCS_USE_CUDA
-    use cudafor
-#endif
-
     integer(c_int), intent(out) :: count
     integer(c_int), intent(out) :: status
 
 #ifdef HPCS_USE_OPENMP_TARGET
-    integer(c_int) :: omp_get_num_devices
-#endif
-
-#ifdef HPCS_USE_CUDA
-    integer :: istat, num_devices
-#endif
-
-    ! Initialize status
-    count = 0_c_int
-    status = HPCS_SUCCESS
-
-    ! Return cached value if already initialized
-    if (device_count_initialized) then
-      count = device_count_cache
-      return
-    end if
-
-    ! Query backend for device count
-#ifdef HPCS_USE_OPENMP_TARGET
-    ! -----------------------------------------------------------------------
     ! OpenMP Target Offload Backend
-    ! -----------------------------------------------------------------------
-    ! Use OpenMP runtime to query number of target devices
-    ! This is the most portable option and works with Intel, AMD, NVIDIA
     count = omp_get_num_devices()
     device_count_cache = count
     device_count_initialized = .true.
 
 #elif defined(HPCS_USE_CUDA)
-    ! -----------------------------------------------------------------------
-    ! CUDA Backend
-    ! -----------------------------------------------------------------------
-    ! Use CUDA Fortran runtime API to query device count
-    ! Requires: NVIDIA GPU hardware + CUDA toolkit
-    istat = cudaGetDeviceCount(num_devices)
-    if (istat == cudaSuccess) then
-      count = num_devices
-      status = HPCS_SUCCESS
-    else
-      ! GPU query failed, fall back to CPU-only mode
-      count = 0_c_int
-      status = HPCS_ERR_NUMERIC_FAIL
-    end if
-
+    ! CUDA Backend - Phase 1 stub: no direct CUDA runtime calls
+    ! We simply report 1 logical device (or 0 if you prefer).
+    count = 1_c_int
     device_count_cache = count
     device_count_initialized = .true.
 
 #elif defined(HPCS_USE_HIP)
-    ! -----------------------------------------------------------------------
-    ! HIP Backend (AMD ROCm)
-    ! -----------------------------------------------------------------------
-    ! Use HIP runtime API to query device count
-    ! Requires: AMD GPU hardware + ROCm toolkit
-    ! Note: This requires external HIP runtime binding (not implemented yet)
-    ! For now, fall through to CPU-only stub
-    count = 0_c_int
+    ! HIP Backend - Phase 1 stub
+    count = 1_c_int
     device_count_cache = count
     device_count_initialized = .true.
 
 #else
-    ! -----------------------------------------------------------------------
-    ! CPU-Only Stub Implementation
-    ! -----------------------------------------------------------------------
-    ! No GPU support compiled in, always report 0 devices
-    ! This maintains ABI compatibility for CPU-only builds
+    ! CPU-only stub
     count = 0_c_int
     device_count_cache = count
     device_count_initialized = .true.
 #endif
-
   end subroutine hpcs_get_device_count
 
   !> Select a specific GPU device for subsequent kernel execution
@@ -305,22 +255,14 @@ contains
   !> initialization or use per-thread device management.
   subroutine hpcs_set_device(device_id, status) &
        bind(C, name="hpcs_set_device")
-#ifdef HPCS_USE_CUDA
-    use cudafor
-#endif
-
     integer(c_int), intent(in), value :: device_id
     integer(c_int), intent(out) :: status
     integer(c_int) :: count, st
 
-#ifdef HPCS_USE_CUDA
-    integer :: istat
-#endif
-
     ! Validate device_id by querying available devices
     call hpcs_get_device_count(count, st)
     if (st /= HPCS_SUCCESS) then
-      status = HPCS_ERR_NUMERIC_FAIL
+      status = HPCS_RUNTIME_ERROR
       return
     end if
 
@@ -341,42 +283,23 @@ contains
 
     ! Set device using backend-specific API
 #ifdef HPCS_USE_OPENMP_TARGET
-    ! -----------------------------------------------------------------------
     ! OpenMP Target Offload Backend
-    ! -----------------------------------------------------------------------
     call omp_set_default_device(device_id)
     current_device = device_id
     status = HPCS_SUCCESS
 
 #elif defined(HPCS_USE_CUDA)
-    ! -----------------------------------------------------------------------
-    ! CUDA Backend
-    ! -----------------------------------------------------------------------
-    ! Use CUDA Fortran runtime API to set active device
-    istat = cudaSetDevice(device_id)
-    if (istat == cudaSuccess) then
-      current_device = device_id
-      status = HPCS_SUCCESS
-    else
-      status = HPCS_ERR_NUMERIC_FAIL
-    end if
+    ! CUDA Backend - Phase 1 stub: no direct cudaSetDevice call
+    current_device = device_id
+    status = HPCS_SUCCESS
 
 #elif defined(HPCS_USE_HIP)
-    ! -----------------------------------------------------------------------
-    ! HIP Backend
-    ! -----------------------------------------------------------------------
-    ! Use hipSetDevice(device_id)
-    ! Note: Requires external HIP runtime binding (not implemented yet)
-    ! For now, just store the device ID
+    ! HIP Backend - Phase 1 stub
     current_device = device_id
     status = HPCS_SUCCESS
 
 #else
-    ! -----------------------------------------------------------------------
-    ! CPU-Only Stub Implementation
-    ! -----------------------------------------------------------------------
-    ! No actual device to set, but store the ID for consistency
-    ! Only device_id=0 is valid in CPU-only mode
+    ! CPU-only stub
     if (device_id == 0_c_int) then
       current_device = device_id
       status = HPCS_SUCCESS
@@ -384,7 +307,6 @@ contains
       status = HPCS_ERR_INVALID_ARGS
     end if
 #endif
-
   end subroutine hpcs_set_device
 
   !> Get the currently selected GPU device ID
@@ -776,7 +698,6 @@ contains
 
   end subroutine gpu_bitonic_sort
 
-#ifdef HPCS_USE_CUDA
   !> Extract median from sorted array
   !>
   !> For odd n: returns middle element
@@ -844,7 +765,6 @@ contains
       median_val = (window_data(window_size/2) + window_data(window_size/2 + 1)) / 2.0_c_double
     end if
   end function gpu_bitonic_sort_window
-#endif
 
   ! ========================================================================
   ! Phase 2: HIGH PRIORITY Kernel Wrappers
