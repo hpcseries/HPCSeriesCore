@@ -758,6 +758,7 @@ contains
   !> @param[in] sorted_data - Sorted array
   !> @param[in] n - Number of elements
   !> @return Median value
+  !$omp declare target
   function gpu_extract_median(sorted_data, n) result(median_val)
     real(c_double), intent(in) :: sorted_data(:)
     integer(c_int), intent(in) :: n
@@ -771,6 +772,7 @@ contains
       median_val = (sorted_data(n/2) + sorted_data(n/2 + 1)) / 2.0_c_double
     end if
   end function gpu_extract_median
+  !$omp end declare target
 
   !> GPU-native small bitonic sort for window processing
   !>
@@ -780,6 +782,7 @@ contains
   !> @param[inout] window_data - Small array to sort in-place
   !> @param[in] window_size - Size of window (small)
   !> @return Median of sorted window
+  !$omp declare target
   function gpu_bitonic_sort_window(window_data, window_size) result(median_val)
     real(c_double), intent(inout) :: window_data(:)
     integer(c_int), intent(in) :: window_size
@@ -817,6 +820,7 @@ contains
       median_val = (window_data(window_size/2) + window_data(window_size/2 + 1)) / 2.0_c_double
     end if
   end function gpu_bitonic_sort_window
+  !$omp end declare target
 
   ! ========================================================================
   ! Phase 2: HIGH PRIORITY Kernel Wrappers
@@ -998,6 +1002,7 @@ contains
     real(c_double), pointer :: input_array(:)
     real(c_double), allocatable, target :: output_array(:)
     real(c_double), allocatable :: work_input(:), work_output(:)
+    real(c_double) :: window_data(MAX_WINDOW_SIZE)  ! Thread-private window buffer
     integer :: i, j, num_windows
 
     ! Validate inputs
@@ -1034,10 +1039,8 @@ contains
     !$omp map(to:input_array(1:n), window) map(from:output_array(1:num_windows)) &
     !$omp private(j, window_data)
     do i = 1, num_windows
-      ! Each thread has its own window buffer (private variable)
-      real(c_double) :: window_data(MAX_WINDOW_SIZE)
-
       ! Extract window (only use first 'window' elements)
+      ! window_data is thread-private via OpenMP private clause
       do j = 1, window
         window_data(j) = input_array(i + j - 1)
       end do
