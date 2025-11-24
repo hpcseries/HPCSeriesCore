@@ -39,6 +39,11 @@ if(HPCS_ENABLE_GPU_OPENMP)
 elseif(HPCS_ENABLE_GPU_CUDA)
     message(STATUS "HPCSeries: GPU acceleration enabled (CUDA backend via NVHPC)")
     add_compile_definitions(HPCS_USE_CUDA)
+    # NVHPC CUDA Fortran flags
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -gpu=cc75")
+    endif()
+
 elseif(HPCS_ENABLE_GPU_HIP)
     message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
 else()
@@ -82,6 +87,11 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /fp:fast /W4 ${OpenMP_C_FLAGS}")
 endif()
 
+
+# When building with CUDA backend and NVHPC, ensure executables link CUDA runtime
+if(HPCS_ENABLE_GPU_CUDA AND CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
+    add_link_options(-cuda)
+endif()
 # Core library target
 add_library(hpcs_core STATIC
     # v0.1/v0.2 modules (maintained for backward compatibility)
