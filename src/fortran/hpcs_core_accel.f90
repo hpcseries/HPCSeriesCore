@@ -758,8 +758,7 @@ contains
   !> @param[in] sorted_data - Sorted array
   !> @param[in] n - Number of elements
   !> @return Median value
-  !$omp declare target (gpu_extract_median, gpu_bitonic_sort_window)
-  function gpu_extract_median(sorted_data, n) result(median_val)
+  attributes(device) function gpu_extract_median(sorted_data, n) result(median_val)
     real(c_double), intent(in) :: sorted_data(:)
     integer(c_int), intent(in) :: n
     real(c_double) :: median_val
@@ -781,7 +780,7 @@ contains
   !> @param[inout] window_data - Small array to sort in-place
   !> @param[in] window_size - Size of window (small)
   !> @return Median of sorted window
-  function gpu_bitonic_sort_window(window_data, window_size) result(median_val)
+  attributes(device) function gpu_bitonic_sort_window(window_data, window_size) result(median_val)
     real(c_double), intent(inout) :: window_data(:)
     integer(c_int), intent(in) :: window_size
     real(c_double) :: median_val
@@ -790,15 +789,10 @@ contains
     logical :: ascending
     real(c_double) :: tmp
 
-    ! Compute log2(window_size) using integer arithmetic (avoids device log())
-    log2_w = 0
-    tmp = 1
-    do while (tmp < window_size)
-      log2_w = log2_w + 1
-      tmp = tmp * 2
-    end do
+    ! Compute log2(window_size)
+    log2_w = ceiling(log(real(window_size, c_double)) / log(2.0_c_double))
 
-    ! Bitonic sort for small window (runs on device thread)
+    ! Bitonic sort for small window (no OpenMP target needed - runs on device thread)
     do stage = 1, log2_w
       do substage = stage, 1, -1
         stride = 2**(substage-1)
@@ -823,7 +817,6 @@ contains
       median_val = (window_data(window_size/2) + window_data(window_size/2 + 1)) / 2.0_c_double
     end if
   end function gpu_bitonic_sort_window
-
 
   ! ========================================================================
   ! Phase 2: HIGH PRIORITY Kernel Wrappers
@@ -1038,7 +1031,9 @@ contains
     ! Memory per thread: window size × 8 bytes (typically 200 × 8 = 1.6 KB)
     ! Note: Fixed-size array used instead of BLOCK construct (NVFORTRAN limitation)
 
-    !$omp target teams distribute parallel do map(to:input_array(1:n), window) map(from:output_array(1:num_windows)) private(j, window_data)
+    !$omp target teams distribute parallel do &
+    !$omp map(to:input_array(1:n), window) map(from:output_array(1:num_windows)) &
+    !$omp private(j, window_data)
     do i = 1, num_windows
       ! Extract window (only use first 'window' elements)
       ! window_data is thread-private via OpenMP private clause
