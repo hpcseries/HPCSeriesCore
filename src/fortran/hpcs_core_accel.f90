@@ -790,10 +790,15 @@ contains
     logical :: ascending
     real(c_double) :: tmp
 
-    ! Compute log2(window_size)
-    log2_w = ceiling(log(real(window_size, c_double)) / log(2.0_c_double))
+    ! Compute log2(window_size) using integer arithmetic (avoids device log())
+    log2_w = 0
+    tmp = 1
+    do while (tmp < window_size)
+      log2_w = log2_w + 1
+      tmp = tmp * 2
+    end do
 
-    ! Bitonic sort for small window (no OpenMP target needed - runs on device thread)
+    ! Bitonic sort for small window (runs on device thread)
     do stage = 1, log2_w
       do substage = stage, 1, -1
         stride = 2**(substage-1)
