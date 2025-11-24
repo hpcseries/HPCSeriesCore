@@ -29,6 +29,9 @@ find_package(OpenMP REQUIRED)
 # ============================================================================
 # v0.4 GPU Acceleration Options (Phase 1)
 # ============================================================================
+# ============================================================================
+# v0.4 GPU Acceleration Options (Phase 1)
+# ============================================================================
 option(HPCS_ENABLE_GPU_OPENMP "Enable GPU acceleration via OpenMP target offloading" OFF)
 option(HPCS_ENABLE_GPU_CUDA "Enable GPU acceleration via CUDA" OFF)
 option(HPCS_ENABLE_GPU_HIP "Enable GPU acceleration via HIP/ROCm (not yet implemented)" OFF)
@@ -36,12 +39,17 @@ option(HPCS_ENABLE_GPU_HIP "Enable GPU acceleration via HIP/ROCm (not yet implem
 if(HPCS_ENABLE_GPU_OPENMP)
     message(STATUS "HPCSeries: GPU acceleration enabled (OpenMP target offloading)")
     add_compile_definitions(HPCS_USE_OPENMP_TARGET)
+
 elseif(HPCS_ENABLE_GPU_CUDA)
     message(STATUS "HPCSeries: GPU acceleration enabled (CUDA backend via NVHPC)")
     add_compile_definitions(HPCS_USE_CUDA)
-    # NVHPC CUDA Fortran flags
+    # NVHPC CUDA Fortran flags: enable CUDA Fortran and target cc75 (Tesla T4)
     if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -gpu=cc75")
+    endif()
+    # Ensure all executables/libraries link CUDA Fortran runtime when using NVHPC C++ linker
+    if(CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
+        add_link_options(-cuda)
     endif()
 
 elseif(HPCS_ENABLE_GPU_HIP)
@@ -88,10 +96,6 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif()
 
 
-# When building with CUDA backend and NVHPC, ensure executables link CUDA runtime
-if(HPCS_ENABLE_GPU_CUDA AND CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
-    add_link_options(-cuda)
-endif()
 # Core library target
 add_library(hpcs_core STATIC
     # v0.1/v0.2 modules (maintained for backward compatibility)
