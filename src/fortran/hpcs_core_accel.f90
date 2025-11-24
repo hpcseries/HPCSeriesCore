@@ -750,6 +750,7 @@ contains
 
   end subroutine gpu_bitonic_sort
 
+#ifdef HPCS_USE_CUDA
   !> Extract median from sorted array
   !>
   !> For odd n: returns middle element
@@ -817,6 +818,7 @@ contains
       median_val = (window_data(window_size/2) + window_data(window_size/2 + 1)) / 2.0_c_double
     end if
   end function gpu_bitonic_sort_window
+#endif
 
   ! ========================================================================
   ! Phase 2: HIGH PRIORITY Kernel Wrappers
