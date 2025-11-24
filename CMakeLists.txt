@@ -43,8 +43,13 @@ if(HPCS_ENABLE_GPU_OPENMP)
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -mp=gpu -gpu=cc75")
     endif()
 elseif(HPCS_ENABLE_GPU_CUDA)
-    message(WARNING "HPCSeries: CUDA backend not yet implemented (Phase 1). Falling back to CPU-only.")
-    # Future: add CUDA runtime bindings
+    message(STATUS "HPCSeries: GPU acceleration enabled (CUDA backend via NVHPC)")
+    add_compile_definitions(HPCS_USE_CUDA)
+    # Configure CUDA Fortran flags when using NVHPC/PGI
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        # Enable free-form, preprocessing, and CUDA GPU code for cc75 (T4)
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -Mpreprocess -cuda -gpu=cc75")
+    endif()
 elseif(HPCS_ENABLE_GPU_HIP)
     message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
     # Future: add HIP runtime bindings
