@@ -141,6 +141,9 @@ module hpcs_core_accel
   type(allocation_t), save :: allocations(MAX_ALLOCATIONS)
   logical, save :: allocations_initialized = .false.
 
+  ! Maximum rolling window size for GPU kernels (adjust as needed)
+  integer(c_int), parameter :: MAX_WINDOW_SIZE = 2048
+
 contains
 
   ! ========================================================================
@@ -1003,6 +1006,12 @@ contains
       return
     end if
 
+    ! Validate window size for GPU path
+    if (window > MAX_WINDOW_SIZE) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
     call c_f_pointer(device_ptr, input_array, [n])
     allocate(output_array(n))
     num_windows = n - window + 1
@@ -1019,23 +1028,22 @@ contains
     !
     ! Parallelism: (n - window + 1) independent threads
     ! Memory per thread: window size × 8 bytes (typically 200 × 8 = 1.6 KB)
+    ! Note: Fixed-size array used instead of BLOCK construct (NVFORTRAN limitation)
 
     !$omp target teams distribute parallel do &
     !$omp map(to:input_array(1:n), window) map(from:output_array(1:num_windows)) &
-    !$omp private(j)
+    !$omp private(j, window_data)
     do i = 1, num_windows
-      ! Each thread has its own window buffer
-      block
-        real(c_double) :: window_data(window)
+      ! Each thread has its own window buffer (private variable)
+      real(c_double) :: window_data(MAX_WINDOW_SIZE)
 
-        ! Extract window
-        do j = 1, window
-          window_data(j) = input_array(i + j - 1)
-        end do
+      ! Extract window (only use first 'window' elements)
+      do j = 1, window
+        window_data(j) = input_array(i + j - 1)
+      end do
 
-        ! Sort window and extract median (GPU-native bitonic sort)
-        output_array(i) = gpu_bitonic_sort_window(window_data, window)
-      end block
+      ! Sort window and extract median (GPU-native bitonic sort)
+      output_array(i) = gpu_bitonic_sort_window(window_data, window)
     end do
     !$omp end target teams distribute parallel do
 
