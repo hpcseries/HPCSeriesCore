@@ -15,6 +15,9 @@ MODE="${1:-cpu}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 DATE=$(date +%Y%m%d)
 
+# Export mode for benchmark executables
+export HPCS_MODE="$MODE"
+
 # Create log directories
 mkdir -p "$LOGS_DIR/benchmarks/$MODE"
 mkdir -p "$LOGS_DIR/tests/$MODE"
@@ -23,10 +26,10 @@ mkdir -p "$LOGS_DIR/reports"
 echo "============================================================================"
 echo "HPCSeries Benchmark Runner"
 echo "============================================================================"
-echo "Mode:      $MODE"
-echo "Timestamp: $TIMESTAMP"
-echo "Build:     $BUILD_DIR"
-echo "Logs:      $LOGS_DIR"
+echo "Mode:        $MODE (HPCS_MODE=$HPCS_MODE)"
+echo "Timestamp:   $TIMESTAMP"
+echo "Build:       $BUILD_DIR"
+echo "Logs:        $LOGS_DIR"
 echo ""
 
 # System information
@@ -55,13 +58,14 @@ fi
 cd "$BUILD_DIR"
 
 # Function to run benchmark and capture output
+# Note: HPCS_MODE environment variable is inherited by all benchmark executables
 run_benchmark() {
     local bench_name=$1
     local bench_exec=$2
     local log_file="$LOGS_DIR/benchmarks/$MODE/${bench_name}_${MODE}_${TIMESTAMP}.csv"
 
     echo "-------------------------------------------------------------------"
-    echo "Running: $bench_name"
+    echo "Running: $bench_name (HPCS_MODE=$HPCS_MODE)"
     echo "Output:  $log_file"
 
     if [ -f "$bench_exec" ]; then
