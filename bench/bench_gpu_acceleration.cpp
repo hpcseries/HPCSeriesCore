@@ -254,11 +254,12 @@ void bench_prefix_sum(Mode mode, const vector<int>& sizes) {
 int main(int argc, char** argv) {
     Mode mode = get_mode();
 
-    cout << "========================================" << endl;
-    cout << "GPU Acceleration Benchmark" << endl;
-    cout << "Mode: " << mode_str(mode) << endl;
-    cout << "========================================" << endl;
-    cout << endl;
+    // Output banner to stderr so it doesn't interfere with CSV output
+    cerr << "========================================" << endl;
+    cerr << "GPU Acceleration Benchmark" << endl;
+    cerr << "Mode: " << mode_str(mode) << endl;
+    cerr << "========================================" << endl;
+    cerr << endl;
 
     // Initialize GPU backend if in GPU mode
     if (mode == GPU) {
@@ -271,11 +272,11 @@ int main(int argc, char** argv) {
 
         int count;
         hpcs_get_device_count(&count, &status);
-        cout << "GPU devices detected: " << count << endl;
+        cerr << "GPU devices detected: " << count << endl;
         if (count == 0) {
             cerr << "Warning: No GPU devices available, results may reflect CPU fallback" << endl;
         }
-        cout << endl;
+        cerr << endl;
     }
 
     // Test sizes (smaller for rolling operations)
@@ -283,29 +284,30 @@ int main(int argc, char** argv) {
     vector<int> rolling_sizes = {100000, 500000, 1000000};  // Skip 5M for rolling
     vector<int> windows = {50, 100, 200};
 
-    // CSV header
+    // CSV header (stdout for CSV processing)
     cout << "kernel,n,window,mode,elapsed_seconds,speedup" << endl;
 
-    // Run benchmarks
-    cout << "# Running reduce_sum benchmark..." << endl;
+    // Run benchmarks (status messages to stderr)
+    cerr << "# Running reduce_sum benchmark..." << endl;
     bench_reduce_sum(mode, sizes);
 
-    cout << "# Running median benchmark..." << endl;
+    cerr << "# Running median benchmark..." << endl;
     bench_median(mode, sizes);
 
-    cout << "# Running MAD benchmark..." << endl;
+    cerr << "# Running MAD benchmark..." << endl;
     bench_mad(mode, sizes);
 
-    cout << "# Running prefix_sum benchmark..." << endl;
+    cerr << "# Running prefix_sum benchmark..." << endl;
     bench_prefix_sum(mode, sizes);
 
-    cout << "# Running rolling_median benchmark..." << endl;
+    cerr << "# Running rolling_median benchmark..." << endl;
     bench_rolling_median(mode, rolling_sizes, windows);
 
-    cout << endl;
-    cout << "========================================" << endl;
-    cout << "Benchmark Complete" << endl;
-    cout << "========================================" << endl;
+    // End banner to stderr
+    cerr << endl;
+    cerr << "========================================" << endl;
+    cerr << "Benchmark Complete" << endl;
+    cerr << "========================================" << endl;
 
     return 0;
 }
