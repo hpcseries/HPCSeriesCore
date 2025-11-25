@@ -145,6 +145,17 @@ def print_comparison_table(cpu_data: Dict, gpu_data: Dict, speedups: Dict):
         print()
 
 
+def filter_benchmark_files(files: List[str], benchmark_name: str = None) -> List[str]:
+    """Filter files by benchmark name pattern."""
+    if benchmark_name is None:
+        return files
+
+    # Filter files that start with benchmark_name
+    filtered = [f for f in files if os.path.basename(f).startswith(f"{benchmark_name}_")]
+
+    return filtered
+
+
 def print_summary_statistics(speedups: Dict):
     """Print summary statistics for speedups."""
     print("\n" + "=" * 100)
@@ -263,8 +274,14 @@ Examples:
   # Compare CPU vs GPU (uses latest file from each mode)
   python3 scripts/compare_benchmarks.py --compare cpu gpu
 
-  # Compare latest 3 CPU runs
-  python3 scripts/compare_benchmarks.py --mode cpu --latest 3
+  # Compare CPU vs GPU for specific benchmark only
+  python3 scripts/compare_benchmarks.py --compare cpu gpu --benchmark gpu_acceleration
+
+  # Compare latest 3 CPU runs of v03_optimized benchmark
+  python3 scripts/compare_benchmarks.py --mode cpu --latest 3 --benchmark v03_optimized
+
+  # Compare GPU acceleration benchmarks (default mode)
+  python3 scripts/compare_benchmarks.py --benchmark gpu_acceleration
         """
     )
     parser.add_argument('--mode', type=str, choices=['cpu', 'gpu'],
@@ -273,6 +290,8 @@ Examples:
                         help='Number of latest benchmark files to compare (default: 2)')
     parser.add_argument('--compare', nargs=2, metavar=('MODE1', 'MODE2'),
                         help='Compare two modes (e.g., cpu gpu)')
+    parser.add_argument('--benchmark', type=str,
+                        help='Filter to specific benchmark type (e.g., gpu_acceleration, v03_optimized, anomaly_detection)')
     parser.add_argument('--logs-dir', type=str, default='logs/benchmarks',
                         help='Path to benchmark logs directory')
     args = parser.parse_args()
@@ -293,15 +312,26 @@ Examples:
         files1 = sorted(glob.glob(str(logs_dir / mode1 / '*.csv')), reverse=True)
         files2 = sorted(glob.glob(str(logs_dir / mode2 / '*.csv')), reverse=True)
 
+        # Apply benchmark filter if specified
+        files1 = filter_benchmark_files(files1, args.benchmark)
+        files2 = filter_benchmark_files(files2, args.benchmark)
+
         if not files1:
-            print(f"Error: No {mode1} benchmark files found")
+            if args.benchmark:
+                print(f"Error: No {mode1} benchmark files found matching '{args.benchmark}'")
+            else:
+                print(f"Error: No {mode1} benchmark files found")
             sys.exit(1)
         if not files2:
-            print(f"Error: No {mode2} benchmark files found")
+            if args.benchmark:
+                print(f"Error: No {mode2} benchmark files found matching '{args.benchmark}'")
+            else:
+                print(f"Error: No {mode2} benchmark files found")
             sys.exit(1)
 
         # Use latest file from each mode
-        print(f"Comparing {mode1.upper()} vs {mode2.upper()}")
+        benchmark_info = f" ({args.benchmark})" if args.benchmark else ""
+        print(f"Comparing {mode1.upper()} vs {mode2.upper()}{benchmark_info}")
         print(f"{mode1.upper()}: {os.path.basename(files1[0])}")
         print(f"{mode2.upper()}: {os.path.basename(files2[0])}")
 
@@ -331,8 +361,14 @@ Examples:
     elif args.mode:
         files = sorted(glob.glob(str(logs_dir / args.mode / '*.csv')), reverse=True)
 
+        # Apply benchmark filter if specified
+        files = filter_benchmark_files(files, args.benchmark)
+
         if not files:
-            print(f"Error: No {args.mode} benchmark files found")
+            if args.benchmark:
+                print(f"Error: No {args.mode} benchmark files found matching '{args.benchmark}'")
+            else:
+                print(f"Error: No {args.mode} benchmark files found")
             sys.exit(1)
 
         # Limit to latest N files
@@ -346,15 +382,24 @@ Examples:
 
     else:
         # Default: Compare latest CPU vs GPU
-        print("No mode specified. Comparing latest CPU vs GPU runs...\n")
+        benchmark_info = f" ({args.benchmark})" if args.benchmark else ""
+        print(f"No mode specified. Comparing latest CPU vs GPU runs{benchmark_info}...\n")
 
         cpu_files = sorted(glob.glob(str(logs_dir / 'cpu' / '*.csv')), reverse=True)
         gpu_files = sorted(glob.glob(str(logs_dir / 'gpu' / '*.csv')), reverse=True)
 
+        # Apply benchmark filter if specified
+        cpu_files = filter_benchmark_files(cpu_files, args.benchmark)
+        gpu_files = filter_benchmark_files(gpu_files, args.benchmark)
+
         if not cpu_files or not gpu_files:
             print("Error: Need both CPU and GPU benchmark files for default comparison")
-            print(f"CPU files found: {len(cpu_files)}")
-            print(f"GPU files found: {len(gpu_files)}")
+            if args.benchmark:
+                print(f"CPU files found matching '{args.benchmark}': {len(cpu_files)}")
+                print(f"GPU files found matching '{args.benchmark}': {len(gpu_files)}")
+            else:
+                print(f"CPU files found: {len(cpu_files)}")
+                print(f"GPU files found: {len(gpu_files)}")
             print("\nTip: Run benchmarks first:")
             print("  ./scripts/run_benchmarks.sh cpu")
             print("  ./scripts/run_benchmarks.sh gpu")
