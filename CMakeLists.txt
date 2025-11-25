@@ -136,6 +136,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_link_libraries(hpcs_core PUBLIC stdc++)
 endif()
 
+# Link CUDA runtime for NVHPC/PGI compiler when CUDA is enabled
+if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+    target_link_options(hpcs_core PUBLIC -cuda)
+endif()
+
 # Installation rules
 install(TARGETS hpcs_core
     ARCHIVE DESTINATION lib
@@ -238,14 +243,23 @@ if(BUILD_BENCHMARKS)
     add_executable(bench_v03 bench/bench_v03.cpp)
     target_link_libraries(bench_v03 hpcs_core)
     target_include_directories(bench_v03 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        target_link_options(bench_v03 PRIVATE -cuda)
+    endif()
 
     # v0.3 optimized benchmark (original vs parallel/fast)
     add_executable(bench_v03_optimized bench/bench_v03_optimized.cpp)
     target_link_libraries(bench_v03_optimized hpcs_core)
     target_include_directories(bench_v03_optimized PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        target_link_options(bench_v03_optimized PRIVATE -cuda)
+    endif()
 
     # Anomaly detection benchmark (classical vs robust vs rolling)
     add_executable(bench_anomaly_detection bench/bench_anomaly_detection.cpp)
     target_link_libraries(bench_anomaly_detection hpcs_core)
     target_include_directories(bench_anomaly_detection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        target_link_options(bench_anomaly_detection PRIVATE -cuda)
+    endif()
 endif()
