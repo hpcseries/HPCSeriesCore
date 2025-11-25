@@ -210,6 +210,9 @@ contains
   !> Performance: O(1) - Single runtime query, cached for efficiency
   subroutine hpcs_get_device_count(count, status) &
        bind(C, name="hpcs_get_device_count")
+#ifdef HPCS_USE_CUDA
+    use hpcs_cuda_runtime
+#endif
     integer(c_int), intent(out) :: count
     integer(c_int), intent(out) :: status
 
@@ -260,6 +263,9 @@ contains
   !> initialization or use per-thread device management.
   subroutine hpcs_set_device(device_id, status) &
        bind(C, name="hpcs_set_device")
+#ifdef HPCS_USE_CUDA
+    use hpcs_cuda_runtime
+#endif
     integer(c_int), intent(in), value :: device_id
     integer(c_int), intent(out) :: status
     integer(c_int) :: count, st
