@@ -105,6 +105,9 @@ echo "Running Benchmarks"
 echo "============================================================================"
 echo ""
 
+# Run GPU acceleration benchmark (CPU vs GPU comparison)
+run_benchmark "gpu_acceleration" "./bench_gpu_acceleration"
+
 # Run v0.3 optimized benchmarks
 run_benchmark "v03_optimized" "./bench_v03_optimized"
 
