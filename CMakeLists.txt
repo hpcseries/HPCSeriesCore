@@ -26,34 +26,34 @@ find_package(OpenMP REQUIRED)
 # Example: cmake -DHPCS_ENABLE_GPU_OPENMP=ON ..
 # ============================================================================
 
-# ============================================================================
-# v0.4 GPU Acceleration Options (Phase 1)
-# ============================================================================
-# ============================================================================
-# v0.4 GPU Acceleration Options (Phase 1)
-# ============================================================================
 option(HPCS_ENABLE_GPU_OPENMP "Enable GPU acceleration via OpenMP target offloading" OFF)
-option(HPCS_ENABLE_GPU_CUDA "Enable GPU acceleration via CUDA" OFF)
+option(HPCS_ENABLE_GPU_CUDA "Enable GPU acceleration via CUDA (not yet implemented)" OFF)
 option(HPCS_ENABLE_GPU_HIP "Enable GPU acceleration via HIP/ROCm (not yet implemented)" OFF)
 
+# Configure GPU backend flags
 if(HPCS_ENABLE_GPU_OPENMP)
     message(STATUS "HPCSeries: GPU acceleration enabled (OpenMP target offloading)")
     add_compile_definitions(HPCS_USE_OPENMP_TARGET)
+    # Add OpenMP target offload flags for supported compilers
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -foffload=nvptx-none")
+    elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fiopenmp -fopenmp-targets=spir64")
+    elseif(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -mp=gpu -gpu=cc75")
+    endif()
+
+# Ensure Fortran preprocessing is enabled for compilers that need it (e.g. GNU).
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -ffree-line-length-none")
+endif()
 
 elseif(HPCS_ENABLE_GPU_CUDA)
-    message(STATUS "HPCSeries: GPU acceleration enabled (CUDA backend via NVHPC)")
-    add_compile_definitions(HPCS_USE_CUDA)
-    # NVHPC CUDA Fortran flags: enable CUDA Fortran and target cc75 (Tesla T4)
-    if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -gpu=cc75")
-    endif()
-    # Ensure all executables/libraries link CUDA Fortran runtime when using NVHPC C++ linker
-    if(CMAKE_CXX_COMPILER_ID MATCHES "PGI|NVHPC")
-        add_link_options(-cuda)
-    endif()
-
+    message(WARNING "HPCSeries: CUDA backend not yet implemented (Phase 1). Falling back to CPU-only.")
+    # Future: add CUDA runtime bindings
 elseif(HPCS_ENABLE_GPU_HIP)
     message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
+    # Future: add HIP runtime bindings
 else()
     message(STATUS "HPCSeries: CPU-only build (GPU acceleration disabled)")
 endif()
@@ -69,22 +69,18 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Enable preprocessing for Fortran across compilers
-if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-Mpreprocess>)
-elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-cpp>)
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-fpp>)
-endif()
-
-# Compiler flags - aggressive optimization for performance
+# Compiler flags - aggressive optimization for performance + OpenMP
+# Note: Removed -ffast-math for Fortran to preserve IEEE 754 NaN handling for data utilities
+# Note: -cpp flag enables preprocessing for #ifdef/#else/#endif directives in .f90 files
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native ${OpenMP_Fortran_FLAGS}")
-    set(CMAKE_Fortran_FLAGS_DEBUG "-g -Wall -Wextra -pedantic -fbounds-check ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -march=native ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS_DEBUG "-cpp -g -Wall -Wextra -pedantic -fbounds-check ${OpenMP_Fortran_FLAGS}")
+elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fpp -O3 -xHost -fp-model fast -ipo ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS_DEBUG "-fpp -g -warn all -check all ${OpenMP_Fortran_FLAGS}")
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -O3 -fast ${OpenMP_Fortran_FLAGS}")
-    set(CMAKE_Fortran_FLAGS_DEBUG "-Mfree -g -Mbounds -Mchkptr -Mchkstk ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -Mpreprocess -O3 -fast ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS_DEBUG "-Mfree -Mpreprocess -g -Mbounds -Mchkptr -Mchkstk ${OpenMP_Fortran_FLAGS}")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -94,7 +90,6 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /fp:fast /W4 ${OpenMP_CXX_FLAGS}")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /fp:fast /W4 ${OpenMP_C_FLAGS}")
 endif()
-
 
 # Core library target
 add_library(hpcs_core STATIC
@@ -106,8 +101,6 @@ add_library(hpcs_core STATIC
     src/fortran/hpcs_core_prefix.f90
     src/fortran/hpcs_core_parallel.f90
     # v0.3 modules (robust statistics & data quality)
-    # v0.4 CUDA runtime interface (real CUDA runtime bindings)
-    src/fortran/hpcs_cuda_runtime.f90
     src/fortran/hpcs_core_stats.f90
     src/fortran/hpcs_core_rolling.f90
     src/fortran/hpcs_core_quality.f90
@@ -186,40 +179,19 @@ if(BUILD_TESTS)
     # ========================================================================
 
     # GPU infrastructure and backend tests
+    add_executable(test_hpcs_gpu_infra tests/test_hpcs_gpu_infra.c)
+    target_link_libraries(test_hpcs_gpu_infra hpcs_core)
+    add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
 
-    # GPU tests only when GPU backend enabled
-    if(HPCS_ENABLE_GPU_OPENMP OR HPCS_ENABLE_GPU_CUDA OR HPCS_ENABLE_GPU_HIP)
-        add_executable(test_hpcs_gpu_infra tests/test_hpcs_gpu_infra.c)
-        target_link_libraries(test_hpcs_gpu_infra hpcs_core)
-        # CUDA executables need -cuda link flag
-        if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-            target_link_options(test_hpcs_gpu_infra PRIVATE -cuda)
+    # GPU kernel implementation tests (Phase 3B optimized)
+    add_executable(test_hpcs_gpu_kernels tests/test_hpcs_gpu_kernels.c)
+    target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
+    add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
 
-        # Simple CUDA device-count test (only when GPU backend is enabled)
-        add_executable(test_cuda_device_count tests/test_cuda_device_count.c)
-        target_link_libraries(test_cuda_device_count hpcs_core)
-        if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-            target_link_options(test_cuda_device_count PRIVATE -cuda)
-        endif()
-        add_test(NAME test_cuda_device_count COMMAND test_cuda_device_count)
-
-        endif()
-        add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
-
-        add_executable(test_hpcs_gpu_kernels tests/test_hpcs_gpu_kernels.c)
-        target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
-        if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-            target_link_options(test_hpcs_gpu_kernels PRIVATE -cuda)
-        endif()
-        add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
-
-        add_executable(test_hpcs_gpu_memory tests/test_hpcs_gpu_memory.c)
-        target_link_libraries(test_hpcs_gpu_memory hpcs_core)
-        if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-            target_link_options(test_hpcs_gpu_memory PRIVATE -cuda)
-        endif()
-        add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
-    endif()
+    # GPU memory management tests (Phase 4A)
+    add_executable(test_hpcs_gpu_memory tests/test_hpcs_gpu_memory.c)
+    target_link_libraries(test_hpcs_gpu_memory hpcs_core)
+    add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
 endif()
 
 # Option to build benchmarks
@@ -233,10 +205,6 @@ if(BUILD_BENCHMARKS)
     add_executable(bench_v03 bench/bench_v03.cpp)
     target_link_libraries(bench_v03 hpcs_core)
     target_include_directories(bench_v03 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    # CUDA backend requires -cuda link flag
-    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-        target_link_options(bench_v03 PRIVATE -cuda)
-    endif()
 
     # v0.3 optimized benchmark (original vs parallel/fast)
     add_executable(bench_v03_optimized bench/bench_v03_optimized.cpp)
