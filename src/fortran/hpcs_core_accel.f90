@@ -210,8 +210,24 @@ contains
   !> Performance: O(1) - Single runtime query, cached for efficiency
   subroutine hpcs_get_device_count(count, status) &
        bind(C, name="hpcs_get_device_count")
+#ifdef HPCS_USE_CUDA
+    use hpcs_cuda_runtime
+#endif
     integer(c_int), intent(out) :: count
     integer(c_int), intent(out) :: status
+#ifdef HPCS_USE_CUDA
+    integer(c_int) :: ierr
+#endif
+
+    ! Initialize status
+    count = 0_c_int
+    status = HPCS_SUCCESS
+
+    ! Return cached value if already initialized
+    if (device_count_initialized) then
+      count = device_count_cache
+      return
+    end if
 
 #ifdef HPCS_USE_OPENMP_TARGET
     ! OpenMP Target Offload Backend
@@ -220,15 +236,21 @@ contains
     device_count_initialized = .true.
 
 #elif defined(HPCS_USE_CUDA)
-    ! CUDA Backend - Phase 1 stub: no direct CUDA runtime calls
-    ! We simply report 1 logical device (or 0 if you prefer).
-    count = 1_c_int
+    ! CUDA Backend - Use actual CUDA runtime via hpcs_cuda_runtime module
+    call hpcs_cuda_get_device_count(count, ierr)
+    if (ierr == HPCS_SUCCESS) then
+      status = HPCS_SUCCESS
+    else
+      ! CUDA query failed, fall back to CPU-only mode
+      count = 0_c_int
+      status = ierr
+    end if
     device_count_cache = count
     device_count_initialized = .true.
 
 #elif defined(HPCS_USE_HIP)
     ! HIP Backend - Phase 1 stub
-    count = 1_c_int
+    count = 0_c_int
     device_count_cache = count
     device_count_initialized = .true.
 
@@ -255,14 +277,20 @@ contains
   !> initialization or use per-thread device management.
   subroutine hpcs_set_device(device_id, status) &
        bind(C, name="hpcs_set_device")
+#ifdef HPCS_USE_CUDA
+    use hpcs_cuda_runtime
+#endif
     integer(c_int), intent(in), value :: device_id
     integer(c_int), intent(out) :: status
     integer(c_int) :: count, st
+#ifdef HPCS_USE_CUDA
+    integer(c_int) :: ierr
+#endif
 
     ! Validate device_id by querying available devices
     call hpcs_get_device_count(count, st)
     if (st /= HPCS_SUCCESS) then
-      status = HPCS_RUNTIME_ERROR
+      status = HPCS_ERR_NUMERIC_FAIL
       return
     end if
 
@@ -289,9 +317,14 @@ contains
     status = HPCS_SUCCESS
 
 #elif defined(HPCS_USE_CUDA)
-    ! CUDA Backend - Phase 1 stub: no direct cudaSetDevice call
-    current_device = device_id
-    status = HPCS_SUCCESS
+    ! CUDA Backend - Use actual CUDA runtime via hpcs_cuda_runtime module
+    call hpcs_cuda_set_device(device_id, ierr)
+    if (ierr == HPCS_SUCCESS) then
+      current_device = device_id
+      status = HPCS_SUCCESS
+    else
+      status = ierr
+    end if
 
 #elif defined(HPCS_USE_HIP)
     ! HIP Backend - Phase 1 stub
