@@ -49,8 +49,12 @@ if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 endif()
 
 elseif(HPCS_ENABLE_GPU_CUDA)
-    message(WARNING "HPCSeries: CUDA backend not yet implemented (Phase 1). Falling back to CPU-only.")
-    # Future: add CUDA runtime bindings
+    message(STATUS "HPCSeries: GPU acceleration enabled (CUDA backend)")
+    add_compile_definitions(HPCS_USE_CUDA)
+    # Add CUDA-specific flags for NVHPC/PGI compiler
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -Mpreprocess -cuda")
+    endif()
 elseif(HPCS_ENABLE_GPU_HIP)
     message(WARNING "HPCSeries: HIP/ROCm backend not yet implemented (Phase 1). Falling back to CPU-only.")
     # Future: add HIP runtime bindings
@@ -91,8 +95,8 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /fp:fast /W4 ${OpenMP_C_FLAGS}")
 endif()
 
-# Core library target
-add_library(hpcs_core STATIC
+# Core library sources (order matters for Fortran module dependencies)
+set(HPCS_CORE_SOURCES
     # v0.1/v0.2 modules (maintained for backward compatibility)
     src/fortran/hpcs_constants.f90
     src/fortran/hpcs_core_1d.f90
@@ -109,9 +113,18 @@ add_library(hpcs_core STATIC
     src/fortran/hpcs_core_quality_parallel.f90
     # v0.3 fast rolling operations (C++ heap-based)
     src/hpcs_rolling_fast.cpp
-    # v0.4 GPU acceleration infrastructure (Phase 1)
-    src/fortran/hpcs_core_accel.f90
 )
+
+# Add CUDA runtime module BEFORE hpcs_core_accel.f90 (dependency order)
+if(HPCS_ENABLE_GPU_CUDA)
+    list(APPEND HPCS_CORE_SOURCES src/fortran/hpcs_cuda_runtime.f90)
+endif()
+
+# v0.4 GPU acceleration infrastructure must come after CUDA runtime
+list(APPEND HPCS_CORE_SOURCES src/fortran/hpcs_core_accel.f90)
+
+# Core library target
+add_library(hpcs_core STATIC ${HPCS_CORE_SOURCES})
 
 target_include_directories(hpcs_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -178,19 +191,39 @@ if(BUILD_TESTS)
     # GPU Acceleration Tests (2106 assertions total)
     # ========================================================================
 
+    # CUDA device detection test (Phase 2 - validates runtime integration)
+    if(HPCS_ENABLE_GPU_OPENMP OR HPCS_ENABLE_GPU_CUDA OR HPCS_ENABLE_GPU_HIP)
+        add_executable(test_cuda_device_count tests/test_cuda_device_count.c)
+        target_link_libraries(test_cuda_device_count hpcs_core)
+        # CUDA builds with NVHPC need -cuda link flag for cudaGetDeviceCount
+        if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+            target_link_options(test_cuda_device_count PRIVATE -cuda)
+        endif()
+        add_test(NAME test_cuda_device_count COMMAND test_cuda_device_count)
+    endif()
+
     # GPU infrastructure and backend tests
     add_executable(test_hpcs_gpu_infra tests/test_hpcs_gpu_infra.c)
     target_link_libraries(test_hpcs_gpu_infra hpcs_core)
+    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        target_link_options(test_hpcs_gpu_infra PRIVATE -cuda)
+    endif()
     add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
 
     # GPU kernel implementation tests (Phase 3B optimized)
     add_executable(test_hpcs_gpu_kernels tests/test_hpcs_gpu_kernels.c)
     target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
+    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        target_link_options(test_hpcs_gpu_kernels PRIVATE -cuda)
+    endif()
     add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
 
     # GPU memory management tests (Phase 4A)
     add_executable(test_hpcs_gpu_memory tests/test_hpcs_gpu_memory.c)
     target_link_libraries(test_hpcs_gpu_memory hpcs_core)
+    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        target_link_options(test_hpcs_gpu_memory PRIVATE -cuda)
+    endif()
     add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
 endif()
 
