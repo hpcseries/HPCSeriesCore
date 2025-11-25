@@ -96,8 +96,8 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif()
 
 
-# Core library target
-add_library(hpcs_core STATIC
+# Core library target - build source list conditionally
+set(HPCS_CORE_SOURCES
     # v0.1/v0.2 modules (maintained for backward compatibility)
     src/fortran/hpcs_constants.f90
     src/fortran/hpcs_core_1d.f90
@@ -105,9 +105,6 @@ add_library(hpcs_core STATIC
     src/fortran/hpcs_core_utils.f90
     src/fortran/hpcs_core_prefix.f90
     src/fortran/hpcs_core_parallel.f90
-    # v0.3 modules (robust statistics & data quality)
-    # v0.4 CUDA runtime interface (real CUDA runtime bindings)
-    src/fortran/hpcs_cuda_runtime.f90
     src/fortran/hpcs_core_stats.f90
     src/fortran/hpcs_core_rolling.f90
     src/fortran/hpcs_core_quality.f90
@@ -116,9 +113,17 @@ add_library(hpcs_core STATIC
     src/fortran/hpcs_core_quality_parallel.f90
     # v0.3 fast rolling operations (C++ heap-based)
     src/hpcs_rolling_fast.cpp
-    # v0.4 GPU acceleration infrastructure (Phase 1)
-    src/fortran/hpcs_core_accel.f90
 )
+
+# Add CUDA runtime module BEFORE hpcs_core_accel.f90 (dependency order)
+if(HPCS_ENABLE_GPU_CUDA)
+    list(APPEND HPCS_CORE_SOURCES src/fortran/hpcs_cuda_runtime.f90)
+endif()
+
+# GPU acceleration infrastructure must come after CUDA runtime
+list(APPEND HPCS_CORE_SOURCES src/fortran/hpcs_core_accel.f90)
+
+add_library(hpcs_core STATIC ${HPCS_CORE_SOURCES})
 
 target_include_directories(hpcs_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
