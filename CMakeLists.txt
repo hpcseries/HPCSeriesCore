@@ -97,7 +97,7 @@ endif()
 
 
 # Core library target
-set(HPCS_CORE_SOURCES
+add_library(hpcs_core STATIC
     # v0.1/v0.2 modules (maintained for backward compatibility)
     src/fortran/hpcs_constants.f90
     src/fortran/hpcs_core_1d.f90
@@ -105,6 +105,9 @@ set(HPCS_CORE_SOURCES
     src/fortran/hpcs_core_utils.f90
     src/fortran/hpcs_core_prefix.f90
     src/fortran/hpcs_core_parallel.f90
+    # v0.3 modules (robust statistics & data quality)
+    # v0.4 CUDA runtime interface (real CUDA runtime bindings)
+    src/fortran/hpcs_cuda_runtime.f90
     src/fortran/hpcs_core_stats.f90
     src/fortran/hpcs_core_rolling.f90
     src/fortran/hpcs_core_quality.f90
@@ -117,17 +120,11 @@ set(HPCS_CORE_SOURCES
     src/fortran/hpcs_core_accel.f90
 )
 
-# Add CUDA runtime module only when CUDA backend is enabled
-if(HPCS_ENABLE_GPU_CUDA)
-    list(APPEND HPCS_CORE_SOURCES src/fortran/hpcs_cuda_runtime.f90)
-endif()
-
-add_library(hpcs_core STATIC ${HPCS_CORE_SOURCES})
-
 target_include_directories(hpcs_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# Link OpenMP and C++ stdlib to the library
 target_link_libraries(hpcs_core PUBLIC OpenMP::OpenMP_Fortran)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_link_libraries(hpcs_core PUBLIC stdc++)
