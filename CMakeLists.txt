@@ -113,6 +113,13 @@ set(HPCS_CORE_SOURCES
     src/fortran/hpcs_core_quality_parallel.f90
     # v0.3 fast rolling operations (C++ heap-based)
     src/hpcs_rolling_fast.cpp
+    # v0.4 CPU modules (batched, masked, axis, anomaly)
+    src/fortran/hpcs_cpu_detect.f90    # Hardware-aware adaptive parallelization
+    src/hpcs_cpu_detect.c              # Enhanced CPU detection (C)
+    src/fortran/hpcs_core_batched.f90
+    src/fortran/hpcs_core_masked.f90
+    src/fortran/hpcs_core_axis.f90
+    src/fortran/hpcs_core_anomaly.f90
 )
 
 # Add CUDA runtime module BEFORE hpcs_core_accel.f90 (dependency order)
@@ -255,6 +262,14 @@ if(BUILD_BENCHMARKS)
         target_link_options(bench_v03_optimized PRIVATE -cuda)
     endif()
 
+    # v0.4 parallel benchmark (batched/axis operations with OpenMP)
+    add_executable(bench_v04_parallel bench/bench_v04_parallel.cpp)
+    target_link_libraries(bench_v04_parallel hpcs_core OpenMP::OpenMP_CXX)
+    target_include_directories(bench_v04_parallel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+        target_link_options(bench_v04_parallel PRIVATE -cuda)
+    endif()
+
     # Anomaly detection benchmark (classical vs robust vs rolling)
     add_executable(bench_anomaly_detection bench/bench_anomaly_detection.cpp)
     target_link_libraries(bench_anomaly_detection hpcs_core)
@@ -270,4 +285,9 @@ if(BUILD_BENCHMARKS)
     if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
         target_link_options(bench_gpu_acceleration PRIVATE -cuda)
     endif()
+
+    # Adaptive parallelization demo (CPU detection and auto-tuning)
+    add_executable(adaptive_demo examples/adaptive_demo.c)
+    target_link_libraries(adaptive_demo hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(adaptive_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
