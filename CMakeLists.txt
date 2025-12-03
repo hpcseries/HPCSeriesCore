@@ -204,53 +204,56 @@ if(BUILD_TESTS)
     # ========================================================================
 
     # Baseline functionality tests (v0.1/v0.2 kernels)
-    add_executable(test_hpcs_baseline tests/test_hpcs_baseline.cpp)
-    target_link_libraries(test_hpcs_baseline hpcs_core)
-    add_test(NAME test_hpcs_baseline COMMAND test_hpcs_baseline)
+    # Moved to tests/c/ - use Makefile in tests/c/ to build
+    # add_executable(test_hpcs_baseline tests/c/test_hpcs_baseline.cpp)
+    # target_link_libraries(test_hpcs_baseline hpcs_core)
+    # add_test(NAME test_hpcs_baseline COMMAND test_hpcs_baseline)
 
     # Robust statistics and anomaly detection tests (v0.3+)
-    add_executable(test_hpcs_robust tests/test_hpcs_robust.c)
-    target_link_libraries(test_hpcs_robust hpcs_core)
-    add_test(NAME test_hpcs_robust COMMAND test_hpcs_robust)
+    # Moved to tests/c/ - use Makefile in tests/c/ to build
+    # add_executable(test_hpcs_robust tests/c/test_hpcs_robust.c)
+    # target_link_libraries(test_hpcs_robust hpcs_core)
+    # add_test(NAME test_hpcs_robust COMMAND test_hpcs_robust)
 
     # ========================================================================
     # GPU Acceleration Tests (2106 assertions total)
     # ========================================================================
 
+    # Tests moved to tests/c/ - use Makefile in tests/c/ to build and run
+
     # CUDA device detection test (Phase 2 - validates runtime integration)
-    if(HPCS_ENABLE_GPU_OPENMP OR HPCS_ENABLE_GPU_CUDA OR HPCS_ENABLE_GPU_HIP)
-        add_executable(test_cuda_device_count tests/test_cuda_device_count.c)
-        target_link_libraries(test_cuda_device_count hpcs_core)
-        # CUDA builds with NVHPC need -cuda link flag for cudaGetDeviceCount
-        if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-            target_link_options(test_cuda_device_count PRIVATE -cuda)
-        endif()
-        add_test(NAME test_cuda_device_count COMMAND test_cuda_device_count)
-    endif()
+    # if(HPCS_ENABLE_GPU_OPENMP OR HPCS_ENABLE_GPU_CUDA OR HPCS_ENABLE_GPU_HIP)
+    #     add_executable(test_cuda_device_count tests/c/test_cuda_device_count.c)
+    #     target_link_libraries(test_cuda_device_count hpcs_core)
+    #     if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+    #         target_link_options(test_cuda_device_count PRIVATE -cuda)
+    #     endif()
+    #     add_test(NAME test_cuda_device_count COMMAND test_cuda_device_count)
+    # endif()
 
     # GPU infrastructure and backend tests
-    add_executable(test_hpcs_gpu_infra tests/test_hpcs_gpu_infra.c)
-    target_link_libraries(test_hpcs_gpu_infra hpcs_core)
-    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-        target_link_options(test_hpcs_gpu_infra PRIVATE -cuda)
-    endif()
-    add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
+    # add_executable(test_hpcs_gpu_infra tests/c/test_hpcs_gpu_infra.c)
+    # target_link_libraries(test_hpcs_gpu_infra hpcs_core)
+    # if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+    #     target_link_options(test_hpcs_gpu_infra PRIVATE -cuda)
+    # endif()
+    # add_test(NAME test_hpcs_gpu_infra COMMAND test_hpcs_gpu_infra)
 
     # GPU kernel implementation tests (Phase 3B optimized)
-    add_executable(test_hpcs_gpu_kernels tests/test_hpcs_gpu_kernels.c)
-    target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
-    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-        target_link_options(test_hpcs_gpu_kernels PRIVATE -cuda)
-    endif()
-    add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
+    # add_executable(test_hpcs_gpu_kernels tests/c/test_hpcs_gpu_kernels.c)
+    # target_link_libraries(test_hpcs_gpu_kernels hpcs_core)
+    # if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+    #     target_link_options(test_hpcs_gpu_kernels PRIVATE -cuda)
+    # endif()
+    # add_test(NAME test_hpcs_gpu_kernels COMMAND test_hpcs_gpu_kernels)
 
     # GPU memory management tests (Phase 4A)
-    add_executable(test_hpcs_gpu_memory tests/test_hpcs_gpu_memory.c)
-    target_link_libraries(test_hpcs_gpu_memory hpcs_core)
-    if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-        target_link_options(test_hpcs_gpu_memory PRIVATE -cuda)
-    endif()
-    add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
+    # add_executable(test_hpcs_gpu_memory tests/c/test_hpcs_gpu_memory.c)
+    # target_link_libraries(test_hpcs_gpu_memory hpcs_core)
+    # if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
+    #     target_link_options(test_hpcs_gpu_memory PRIVATE -cuda)
+    # endif()
+    # add_test(NAME test_hpcs_gpu_memory COMMAND test_hpcs_gpu_memory)
 endif()
 
 # Option to build benchmarks
