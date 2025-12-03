@@ -99,6 +99,8 @@ endif()
 set(HPCS_CORE_SOURCES
     # v0.1/v0.2 modules (maintained for backward compatibility)
     src/fortran/hpcs_constants.f90
+    # v0.6 SIMD interface (early in build order)
+    src/fortran/hpcs_simd_interface.f90
     src/fortran/hpcs_core_1d.f90
     src/fortran/hpcs_core_reductions.f90
     src/fortran/hpcs_core_utils.f90
@@ -124,6 +126,7 @@ set(HPCS_CORE_SOURCES
     src/hpcs_rolling_simd.c            # SIMD rolling operations
     src/hpcs_zscore_simd.c             # SIMD z-score normalization
     src/hpcs_simd_align.c              # Memory alignment utilities
+    src/hpcs_fortran_simd_bridge.c     # Fortran-SIMD integration bridge
     src/fortran/hpcs_core_batched.f90
     src/fortran/hpcs_core_masked.f90
     src/fortran/hpcs_core_axis.f90
@@ -318,4 +321,9 @@ if(BUILD_BENCHMARKS)
     add_executable(bench_simd examples/bench_simd.c)
     target_link_libraries(bench_simd hpcs_core OpenMP::OpenMP_C)
     target_include_directories(bench_simd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # Fortran-SIMD integration test (v0.6)
+    add_executable(test_fortran_simd examples/test_fortran_simd.c)
+    target_link_libraries(test_fortran_simd hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(test_fortran_simd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
