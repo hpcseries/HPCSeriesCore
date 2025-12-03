@@ -1,0 +1,98 @@
+[build-system]
+requires = [
+    "setuptools>=65.0",
+    "wheel",
+    "Cython>=3.0",
+    "numpy>=1.20"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hpcs"
+version = "0.7.0"
+description = "High-Performance Computing Series - Optimized Statistical Kernels"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "HPCSeries Core Team"}
+]
+keywords = ["hpc", "statistics", "numpy", "performance", "simd", "openmp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Cython",
+    "Programming Language :: C",
+    "Programming Language :: Fortran",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+]
+
+dependencies = [
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-benchmark",
+    "black",
+    "mypy",
+    "ruff",
+]
+docs = [
+    "sphinx>=5.0",
+    "sphinx-rtd-theme",
+    "nbsphinx",
+]
+examples = [
+    "jupyter",
+    "matplotlib",
+    "pandas",
+]
+
+[project.urls]
+Homepage = "https://github.com/hpcseries/core"
+Documentation = "https://hpcseries.readthedocs.io"
+Repository = "https://github.com/hpcseries/core"
+Changelog = "https://github.com/hpcseries/core/blob/main/CHANGELOG.md"
+
+[project.scripts]
+hpcs = "hpcs.cli:main"
+
+[tool.setuptools]
+packages = ["hpcs"]
+package-dir = {"" = "python"}
+
+[tool.setuptools.package-data]
+hpcs = ["*.so", "*.dylib", "*.pyd"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
