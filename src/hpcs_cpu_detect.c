@@ -7,6 +7,11 @@
  * - CPU vendor/model identification
  */
 
+// Define _GNU_SOURCE for Linux-specific extensions (pthread affinity, CPU_SET)
+#ifndef _WIN32
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -772,3 +777,217 @@ void hpcs_print_tuning(const hpcs_tuning_t *tuning) {
     printf("\n");
     printf("=================================\n");
 }
+
+// ============================================================================
+// v0.5 NUMA Affinity Application Functions (Linux pthread)
+// ============================================================================
+
+#ifdef __linux__
+
+/**
+ * Apply compact thread affinity - pin threads to cores on same NUMA node
+ *
+ * Strategy: Keep all threads on the same NUMA node for best cache locality
+ * and minimal cross-node memory traffic. Good for operations with high
+ * data reuse (e.g., rolling operations).
+ *
+ * @param num_threads - Number of threads to configure
+ * @param preferred_node - Preferred NUMA node (or -1 for auto-select)
+ * @return 0 on success, -1 on error
+ */
+int hpcs_apply_compact_affinity(int num_threads, int preferred_node) {
+    hpcs_cpu_info_t cpu_info;
+    cpu_set_t cpuset;
+    int status = 0;
+
+    // Get CPU information
+    hpcs_cpu_detect_enhanced(&cpu_info);
+
+    // If single NUMA node, nothing to do
+    if (cpu_info.numa_nodes <= 1) {
+        return 0;  // Success - no NUMA to optimize
+    }
+
+    // Auto-select node 0 if not specified
+    if (preferred_node < 0) {
+        preferred_node = 0;
+    }
+
+    // Validate preferred node
+    if (preferred_node >= cpu_info.numa_nodes) {
+        preferred_node = 0;  // Fallback to node 0
+    }
+
+    // Calculate core range for this NUMA node
+    int cores_per_node = cpu_info.cores_per_numa_node;
+    int start_core = preferred_node * cores_per_node;
+    int end_core = start_core + cores_per_node;
+
+    // Limit to available cores
+    if (end_core > cpu_info.num_physical_cores) {
+        end_core = cpu_info.num_physical_cores;
+    }
+
+    // Build CPU set for the target NUMA node
+    CPU_ZERO(&cpuset);
+    for (int core = start_core; core < end_core; core++) {
+        CPU_SET(core, &cpuset);
+    }
+
+    // Apply affinity to current thread (master thread)
+    if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
+        status = -1;  // Failed to set affinity
+    }
+
+    return status;
+}
+
+/**
+ * Apply spread thread affinity - distribute threads across NUMA nodes
+ *
+ * Strategy: Distribute threads evenly across NUMA nodes to maximize
+ * memory bandwidth. Good for operations with low data reuse and high
+ * bandwidth requirements (e.g., anomaly detection).
+ *
+ * @param num_threads - Number of threads to configure
+ * @return 0 on success, -1 on error
+ */
+int hpcs_apply_spread_affinity(int num_threads) {
+    hpcs_cpu_info_t cpu_info;
+    cpu_set_t cpuset;
+    int status = 0;
+
+    // Get CPU information
+    hpcs_cpu_detect_enhanced(&cpu_info);
+
+    // If single NUMA node, nothing to do
+    if (cpu_info.numa_nodes <= 1) {
+        return 0;  // Success - no NUMA to optimize
+    }
+
+    // Build CPU set spanning all NUMA nodes
+    CPU_ZERO(&cpuset);
+
+    // Distribute threads across nodes in round-robin fashion
+    int cores_per_node = cpu_info.cores_per_numa_node;
+    int threads_per_node = (num_threads + cpu_info.numa_nodes - 1) / cpu_info.numa_nodes;
+
+    for (int node = 0; node < cpu_info.numa_nodes; node++) {
+        int start_core = node * cores_per_node;
+        int node_threads = (node < cpu_info.numa_nodes - 1) ? threads_per_node :
+                          (num_threads - node * threads_per_node);
+
+        // Add cores from this node
+        for (int i = 0; i < node_threads && (start_core + i) < cpu_info.num_physical_cores; i++) {
+            CPU_SET(start_core + i, &cpuset);
+        }
+    }
+
+    // Apply affinity to current thread (master thread)
+    if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
+        status = -1;  // Failed to set affinity
+    }
+
+    return status;
+}
+
+/**
+ * Apply NUMA affinity based on current affinity mode and operation type
+ *
+ * Automatically selects the best affinity strategy based on:
+ * - Global affinity mode (AUTO, COMPACT, SPREAD)
+ * - Operation class (simple, rolling, robust, anomaly)
+ *
+ * @param num_threads - Number of threads to configure
+ * @param op_class - Operation class (1=simple, 2=rolling, 3=robust, 4=anomaly)
+ * @return 0 on success, -1 on error
+ */
+int hpcs_apply_numa_affinity(int num_threads, int op_class) {
+    int affinity_mode = g_affinity_mode;
+
+    // Auto-select mode if needed
+    if (affinity_mode == 0) {  // AFFINITY_AUTO
+        int numa_mode = hpcs_get_tuning_numa_mode(op_class);
+
+        switch (numa_mode) {
+            case 1:  // COMPACT
+                return hpcs_apply_compact_affinity(num_threads, -1);
+            case 2:  // SPREAD
+                return hpcs_apply_spread_affinity(num_threads);
+            default:  // AUTO - use heuristic
+                // Rolling ops benefit from compact (cache locality)
+                // Anomaly detection benefits from spread (bandwidth)
+                if (op_class == 2) {  // Rolling
+                    return hpcs_apply_compact_affinity(num_threads, -1);
+                } else if (op_class == 4) {  // Anomaly
+                    return hpcs_apply_spread_affinity(num_threads);
+                }
+                // Default: no affinity change
+                return 0;
+        }
+    }
+
+    // Apply explicit mode
+    switch (affinity_mode) {
+        case 1:  // COMPACT
+            return hpcs_apply_compact_affinity(num_threads, -1);
+        case 2:  // SPREAD
+            return hpcs_apply_spread_affinity(num_threads);
+        default:
+            return 0;  // No affinity
+    }
+}
+
+/**
+ * Get affinity for specific core (for debugging/testing)
+ *
+ * @param core_id - Core ID to query
+ * @param numa_node - Output: NUMA node for this core
+ * @return 0 on success, -1 on error
+ */
+int hpcs_get_core_affinity(int core_id, int *numa_node) {
+    hpcs_cpu_info_t cpu_info;
+
+    hpcs_cpu_detect_enhanced(&cpu_info);
+
+    if (core_id < 0 || core_id >= cpu_info.num_physical_cores) {
+        return -1;  // Invalid core ID
+    }
+
+    // Calculate NUMA node (simple distribution)
+    if (cpu_info.numa_nodes > 1) {
+        *numa_node = core_id / cpu_info.cores_per_numa_node;
+    } else {
+        *numa_node = 0;
+    }
+
+    return 0;
+}
+
+#else
+// Non-Linux platforms: stub implementations
+
+int hpcs_apply_compact_affinity(int num_threads, int preferred_node) {
+    (void)num_threads;
+    (void)preferred_node;
+    return 0;  // No-op on non-Linux
+}
+
+int hpcs_apply_spread_affinity(int num_threads) {
+    (void)num_threads;
+    return 0;  // No-op on non-Linux
+}
+
+int hpcs_apply_numa_affinity(int num_threads, int op_class) {
+    (void)num_threads;
+    (void)op_class;
+    return 0;  // No-op on non-Linux
+}
+
+int hpcs_get_core_affinity(int core_id, int *numa_node) {
+    (void)core_id;
+    *numa_node = 0;
+    return 0;  // Single node on non-Linux
+}
+
+#endif  // __linux__
