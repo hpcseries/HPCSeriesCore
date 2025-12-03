@@ -33,7 +33,7 @@ cdef extern from "hpcs_cpu_detect.h":
     void hpcs_cpu_detect_init()
     void hpcs_cpu_detect_enhanced(hpcs_cpu_info_t *info)
 
-cdef extern from "hpcs_simd_dispatch.h":
+cdef extern from "hpcs_core.h":
     const char* hpcs_get_simd_name()
     int hpcs_get_simd_width_doubles()
     int hpcs_get_simd_width_bytes()

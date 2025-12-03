@@ -67,7 +67,7 @@ def cmd_cpuinfo(args):
 
         print("SIMD Capabilities:")
         print(f"  Active ISA:          {simd_info['isa']}")
-        print(f"  Vector width:        {simd_info['width_bits']}-bit ({simd_info['width_doubles']} doubles)")
+        print(f"  Vector width:        {simd_info['width_bytes'] * 8}-bit ({simd_info['width_doubles']} doubles)")
         print(f"  SSE2:                {'✓' if cpu_info['has_sse2'] else '✗'}")
         print(f"  AVX:                 {'✓' if cpu_info['has_avx'] else '✗'}")
         print(f"  AVX2:                {'✓' if cpu_info['has_avx2'] else '✗'}")

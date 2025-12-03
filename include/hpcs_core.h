@@ -783,6 +783,51 @@ void hpcs_accel_prefix_sum(
     int        *status
 );
 
+/* ============================================================================
+ * v0.6 SIMD INFORMATION & DISPATCH
+ * ============================================================================
+ * Runtime SIMD capability detection and instruction set information.
+ * Functions to query the active SIMD ISA and vector width.
+ * ========================================================================== */
+
+/* Get name of active SIMD instruction set
+ *
+ * Returns a string like "AVX2", "AVX", "SSE2", "NEON", or "Scalar".
+ *
+ * Returns:
+ *   Pointer to static string (do not free)
+ */
+const char* hpcs_get_simd_name(void);
+
+/* Get SIMD vector width in bytes
+ *
+ * Returns:
+ *   32 for AVX2, 16 for SSE2/NEON, 8 for scalar
+ */
+int hpcs_get_simd_width_bytes(void);
+
+/* Get SIMD vector width in number of doubles
+ *
+ * Returns:
+ *   4 for AVX2, 2 for SSE2/NEON, 1 for scalar
+ */
+int hpcs_get_simd_width_doubles(void);
+
+/* Print current SIMD configuration to stdout
+ *
+ * Prints active ISA and vector width information
+ */
+void hpcs_print_simd_status(void);
+
+/* Initialize SIMD dispatch system and register all SIMD kernels
+ *
+ * Must be called before using any SIMD-accelerated functions.
+ * Safe to call multiple times (subsequent calls are ignored).
+ */
+void hpcs_simd_reductions_init(void);
+void hpcs_rolling_simd_init(void);
+void hpcs_zscore_simd_init(void);
+
 #ifdef __cplusplus
 }
 #endif

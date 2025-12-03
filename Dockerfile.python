@@ -37,16 +37,22 @@ RUN cmake -S . -B build && \
     cmake --build build -j$(nproc) && \
     ls -lh build/libhpcs_core.a
 
-# Build Python extensions (development mode)
-# Note: Using --no-build-isolation to use system packages
-RUN python3 -m pip install -e . --no-build-isolation || \
-    (echo "Build failed. Checking library..." && \
-     ls -lh build/ && \
-     ldd build/libhpcs_core.a 2>&1 || true && \
-     exit 1)
+# Set Python path (before building extensions)
+ENV PYTHONPATH="/workspace/python"
 
-# Set Python path
-ENV PYTHONPATH="/workspace/python:${PYTHONPATH}"
+# Build Python extensions (development mode)
+# Using --no-build-isolation to use system packages, -v for verbose output
+RUN python3 -m pip install -e . --no-build-isolation -v 2>&1 | tee /tmp/build.log || \
+    (echo "=== BUILD FAILED ===" && \
+     echo "Last 50 lines of build log:" && \
+     tail -50 /tmp/build.log && \
+     echo "" && \
+     echo "Library check:" && \
+     ls -lh build/libhpcs_core.a && \
+     echo "" && \
+     echo "Build directory:" && \
+     ls -lh build/ | head -20 && \
+     exit 1)
 
 # Default command
 CMD ["/bin/bash"]

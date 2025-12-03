@@ -24,6 +24,11 @@ cnp.import_array()
 # ==============================================================================
 
 cdef extern from "hpcs_core.h":
+    # Initialization
+    void hpcs_simd_reductions_init()
+    void hpcs_rolling_simd_init()
+    void hpcs_zscore_simd_init()
+
     # Status codes
     int HPCS_SUCCESS
     int HPCS_ERR_INVALID_ARGS
@@ -50,7 +55,7 @@ cdef extern from "hpcs_core.h":
     # Rolling operations (v0.3)
     void hpcs_rolling_mean(const double *x, int n, int window, double *y, int *status)
     void hpcs_rolling_std(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_var(const double *x, int n, int window, double *y, int *status)
+    void hpcs_rolling_variance(const double *x, int n, int window, double *y, int *status)
     void hpcs_rolling_median(const double *x, int n, int window, double *y, int *status)
     void hpcs_rolling_mad(const double *x, int n, int window, double *y, int *status)
 
@@ -77,6 +82,15 @@ cdef inline void check_status(int status, str func_name):
             raise ValueError(f"{func_name}: Invalid arguments")
         else:
             raise RuntimeError(f"{func_name}: Error code {status}")
+
+# ==============================================================================
+# Module Initialization
+# ==============================================================================
+
+# Initialize SIMD dispatch system when module is imported
+hpcs_simd_reductions_init()
+hpcs_rolling_simd_init()
+hpcs_zscore_simd_init()
 
 # ==============================================================================
 # Python API - Reductions
@@ -369,7 +383,7 @@ def rolling_var(x, int window):
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
 
-    hpcs_rolling_var(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_variance(&arr[0], n, window, &result[0], &status)
     check_status(status, "rolling_var")
 
     return result
