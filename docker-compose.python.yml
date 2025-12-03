@@ -1,0 +1,24 @@
+# HPCSeries Core v0.7 - Python Development Environment
+# Usage: docker-compose -f docker-compose.python.yml up -d
+
+version: '3.8'
+
+services:
+  hpcs-python:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: hpcs-python-dev
+    volumes:
+      - .:/workspace
+      - hpcs-build:/workspace/build
+    working_dir: /workspace
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+    environment:
+      - PYTHONPATH=/workspace/python
+      - OMP_NUM_THREADS=4
+
+volumes:
+  hpcs-build:
