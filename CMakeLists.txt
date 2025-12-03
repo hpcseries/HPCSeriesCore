@@ -116,6 +116,14 @@ set(HPCS_CORE_SOURCES
     # v0.4 CPU modules (batched, masked, axis, anomaly)
     src/fortran/hpcs_cpu_detect.f90    # Hardware-aware adaptive parallelization
     src/hpcs_cpu_detect.c              # Enhanced CPU detection (C)
+    src/hpcs_calibrate.c               # v0.5 Benchmark-based auto-tuning
+    # v0.6 SIMD vectorization modules
+    src/hpcs_simd_dispatch.c           # SIMD runtime dispatch
+    src/hpcs_reduce_simd.c             # SIMD reduction kernels (OpenMP)
+    src/hpcs_reduce_intrinsics.c       # SIMD reduction kernels (intrinsics)
+    src/hpcs_rolling_simd.c            # SIMD rolling operations
+    src/hpcs_zscore_simd.c             # SIMD z-score normalization
+    src/hpcs_simd_align.c              # Memory alignment utilities
     src/fortran/hpcs_core_batched.f90
     src/fortran/hpcs_core_masked.f90
     src/fortran/hpcs_core_axis.f90
@@ -290,4 +298,24 @@ if(BUILD_BENCHMARKS)
     add_executable(adaptive_demo examples/adaptive_demo.c)
     target_link_libraries(adaptive_demo hpcs_core OpenMP::OpenMP_C)
     target_include_directories(adaptive_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # NUMA affinity demo (v0.5 - NUMA topology and thread affinity)
+    add_executable(numa_affinity_demo examples/numa_affinity_demo.c)
+    target_link_libraries(numa_affinity_demo hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(numa_affinity_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # Calibration demo (v0.5 - Benchmark-based auto-tuning)
+    add_executable(calibration_demo examples/calibration_demo.c)
+    target_link_libraries(calibration_demo hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(calibration_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # Calibration verification (v0.5 - Before/after performance comparison)
+    add_executable(verify_calibration examples/verify_calibration.c)
+    target_link_libraries(verify_calibration hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(verify_calibration PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # SIMD benchmark (v0.6 - Vectorization performance comparison)
+    add_executable(bench_simd examples/bench_simd.c)
+    target_link_libraries(bench_simd hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(bench_simd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
