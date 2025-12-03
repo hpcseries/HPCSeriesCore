@@ -38,9 +38,15 @@ else:
 # Library path
 lib_path = LIB_DIR / LIB_NAME
 if not lib_path.exists():
-    print(f"WARNING: {lib_path} not found. Build the C library first with:")
+    print(f"ERROR: {lib_path} not found!")
+    print("Build the C library first with:")
     print("  cmake -S . -B build && cmake --build build")
-    # Don't fail here - allow setup to proceed for sdist creation
+    print(f"\nSearching for library in: {BUILD_DIR}")
+    if BUILD_DIR.exists():
+        print("Files in build directory:")
+        import subprocess
+        subprocess.run(["ls", "-lh", str(BUILD_DIR)])
+    raise FileNotFoundError(f"Required library not found: {lib_path}")
 
 # Compiler flags
 extra_compile_args = [

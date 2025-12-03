@@ -34,13 +34,19 @@ RUN python3 -m pip install --upgrade pip && \
 
 # Build C library first
 RUN cmake -S . -B build && \
-    cmake --build build -j$(nproc)
+    cmake --build build -j$(nproc) && \
+    ls -lh build/libhpcs_core.a
 
 # Build Python extensions (development mode)
-RUN python3 -m pip install -e .
+# Note: Using --no-build-isolation to use system packages
+RUN python3 -m pip install -e . --no-build-isolation || \
+    (echo "Build failed. Checking library..." && \
+     ls -lh build/ && \
+     ldd build/libhpcs_core.a 2>&1 || true && \
+     exit 1)
 
 # Set Python path
-ENV PYTHONPATH=/workspace/python:$PYTHONPATH
+ENV PYTHONPATH="/workspace/python:${PYTHONPATH}"
 
 # Default command
 CMD ["/bin/bash"]

@@ -73,6 +73,9 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# Enable position-independent code (required for Python extensions)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Compiler flags - aggressive optimization for performance + OpenMP
 # Note: Removed -ffast-math for Fortran to preserve IEEE 754 NaN handling for data utilities
 # Note: -cpp flag enables preprocessing for #ifdef/#else/#endif directives in .f90 files
