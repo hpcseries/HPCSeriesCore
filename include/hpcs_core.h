@@ -148,6 +148,165 @@ void hpcs_group_reduce_variance(
 );
 
 /* --------------------------------------------------------------------- */
+/* SIMD-Accelerated Reductions (v0.6 - Fortran-C Bridge)                */
+/* --------------------------------------------------------------------- */
+
+/* SIMD-accelerated sum (Fortran-compatible interface) */
+void hpcs_reduce_sum_simd(
+    const double *x,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* SIMD-accelerated mean */
+void hpcs_reduce_mean_simd(
+    const double *x,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* SIMD-accelerated variance */
+void hpcs_reduce_variance_simd(
+    const double *x,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* SIMD-accelerated standard deviation */
+void hpcs_reduce_std_simd(
+    const double *x,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* SIMD-accelerated min */
+void hpcs_reduce_min_simd(
+    const double *x,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* SIMD-accelerated max */
+void hpcs_reduce_max_simd(
+    const double *x,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* --------------------------------------------------------------------- */
+/* Axis Reductions (v0.4 - 2D array operations)                         */
+/* --------------------------------------------------------------------- */
+
+/* Sum along axis 1 (per-row sum) - x is (n×m) Fortran-order */
+void hpcs_reduce_sum_axis1(
+    const double *x,
+    int           n,
+    int           m,
+    double       *out,
+    int          *status
+);
+
+/* Mean along axis 1 (per-row mean) */
+void hpcs_reduce_mean_axis1(
+    const double *x,
+    int           n,
+    int           m,
+    double       *out,
+    int          *status
+);
+
+/* Median along axis 1 (per-row median) */
+void hpcs_median_axis1(
+    const double *x,
+    int           n,
+    int           m,
+    double       *out,
+    int          *status
+);
+
+/* MAD along axis 1 (per-row median absolute deviation) */
+void hpcs_mad_axis1(
+    const double *x,
+    int           n,
+    int           m,
+    double       *out,
+    int          *status
+);
+
+/* Min along axis 0 (per-column min) - SIMD-accelerated */
+void hpcs_reduce_min_axis0_simd(
+    const double *x,
+    int           n,
+    int           m,
+    double       *out,
+    int          *status
+);
+
+/* Max along axis 0 (per-column max) - SIMD-accelerated */
+void hpcs_reduce_max_axis0_simd(
+    const double *x,
+    int           n,
+    int           m,
+    double       *out,
+    int          *status
+);
+
+/* --------------------------------------------------------------------- */
+/* Masked Reductions (v0.4 - operations on masked arrays)               */
+/* --------------------------------------------------------------------- */
+
+/* Sum of masked array (mask[i]=1 means valid, 0 means skip) */
+void hpcs_reduce_sum_masked(
+    const double *x,
+    const int    *mask,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* Mean of masked array */
+void hpcs_reduce_mean_masked(
+    const double *x,
+    const int    *mask,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* Variance of masked array */
+void hpcs_reduce_variance_masked(
+    const double *x,
+    const int    *mask,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* Median of masked array */
+void hpcs_median_masked(
+    const double *x,
+    const int    *mask,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* MAD of masked array */
+void hpcs_mad_masked(
+    const double *x,
+    const int    *mask,
+    int           n,
+    double       *out,
+    int          *status
+);
+
+/* --------------------------------------------------------------------- */
 /* Array utilities (hpcs_core_utils)                                     */
 /* --------------------------------------------------------------------- */
 

@@ -643,7 +643,7 @@ void hpcs_rolling_robust_zscore(const double *x, int n, int window, double *y, i
  */
 void hpcs_register_rolling_simd_kernels(void) {
     hpcs_register_rolling_mean_kernel(SIMD_OPENMP, rolling_mean_openmp_simd);
-    fprintf(stderr, "[SIMD] Registered OpenMP SIMD rolling operations\n");
+    // Silent registration - removed debug output
 }
 
 /**

@@ -114,30 +114,8 @@ contains
       vendor_str(i:i) = g_cpu_info%cpu_vendor(i)
     end do
 
-    ! Print detection results
-    print '(A)', '=== HPCS CPU Detection v0.5 ==='
-    print '(A,I0)', 'Logical cores:   ', g_cpu_info%num_logical_cores
-    print '(A,I0)', 'Physical cores:  ', g_cpu_info%num_physical_cores
-    print '(A,I0)', 'Optimal threads: ', g_cpu_info%optimal_threads
-    print '(A)', ''
-    print '(A,I0)', 'L1 cache (KB):   ', g_cpu_info%l1_cache_size_kb
-    print '(A,I0)', 'L2 cache (KB):   ', g_cpu_info%l2_cache_size_kb
-    print '(A,I0)', 'L3 cache (KB):   ', g_cpu_info%l3_cache_size_kb
-    print '(A)', ''
-    print '(A,I0)', 'NUMA nodes:      ', g_cpu_info%numa_nodes
-    print '(A,I0)', 'Cores per node:  ', g_cpu_info%cores_per_numa_node
-    print '(A)', ''
-    if (len_trim(vendor_str) > 0) then
-      print '(A,A)', 'CPU vendor:      ', trim(vendor_str)
-    end if
-    print '(A,I0,A)', 'SIMD width:      ', g_cpu_info%simd_width_bits, ' bits'
-    print '(A,L1)', 'Has SSE2:        ', g_cpu_info%has_sse2 /= 0
-    print '(A,L1)', 'Has AVX:         ', g_cpu_info%has_avx /= 0
-    print '(A,L1)', 'Has AVX2:        ', g_cpu_info%has_avx2 /= 0
-    print '(A,L1)', 'Has AVX-512:     ', g_cpu_info%has_avx512 /= 0
-    print '(A,L1)', 'Has NEON:        ', g_cpu_info%has_neon /= 0
-    print '(A,L1)', 'Has FMA3:        ', g_cpu_info%has_fma3 /= 0
-    print '(A)', '================================'
+    ! Silent initialization - output only via explicit cpuinfo command
+    ! (Removed auto-print to avoid cluttering import output)
   end subroutine hpcs_cpu_detect_init
 
   !----------------------------------------------------------------------------

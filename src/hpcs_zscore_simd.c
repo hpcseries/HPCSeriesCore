@@ -320,5 +320,5 @@ void hpcs_robust_zscore_auto(const double *x, int n, double *result, int thresho
  * Initialize z-score SIMD module
  */
 void hpcs_zscore_simd_init(void) {
-    fprintf(stderr, "[SIMD] Z-score kernels initialized\n");
+    // Silent initialization - removed debug output
 }

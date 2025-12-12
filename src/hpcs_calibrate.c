@@ -399,14 +399,14 @@ extern int hpcs_set_tuning(const hpcs_tuning_t *tuning);
 /**
  * Get default config directory path
  *
- * Linux/macOS: ~/.hpcseries/
- * Windows: %APPDATA%/hpcseries/
+ * Linux/macOS: ~/.hpcs/
+ * Windows: %APPDATA%/hpcs/
  */
 static int get_config_dir(char *path, size_t path_size) {
 #ifdef _WIN32
     const char *appdata = getenv("APPDATA");
     if (appdata) {
-        snprintf(path, path_size, "%s/hpcseries", appdata);
+        snprintf(path, path_size, "%s/hpcs", appdata);
         return 0;
     }
     return -1;
@@ -421,7 +421,7 @@ static int get_config_dir(char *path, size_t path_size) {
     }
 
     if (home) {
-        snprintf(path, path_size, "%s/.hpcseries", home);
+        snprintf(path, path_size, "%s/.hpcs", home);
         return 0;
     }
     return -1;
@@ -431,8 +431,8 @@ static int get_config_dir(char *path, size_t path_size) {
 /**
  * Get default config file path
  *
- * Linux/macOS: ~/.hpcseries/config.json
- * Windows: %APPDATA%/hpcseries/config.json
+ * Linux/macOS: ~/.hpcs/config.json
+ * Windows: %APPDATA%/hpcs/config.json
  */
 static int get_config_path(char *path, size_t path_size) {
     char dir[512];

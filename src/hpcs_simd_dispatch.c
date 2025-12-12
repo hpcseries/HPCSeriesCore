@@ -89,9 +89,7 @@ static void detect_simd_isa(void) {
     hpcs_cpu_detect_init();
     hpcs_cpu_detect_enhanced(&cpu_info);
 
-    // Debug: Print detected SIMD capabilities
-    fprintf(stderr, "[SIMD Debug] AVX-512=%d, AVX2=%d, AVX=%d, SSE2=%d\n",
-            cpu_info.has_avx512, cpu_info.has_avx2, cpu_info.has_avx, cpu_info.has_sse2);
+    // Silent detection - removed debug output
 
     // Prioritize widest available ISA
     // Note: Only use hardware ISA if actually available
@@ -118,16 +116,7 @@ static void detect_simd_isa(void) {
 
     g_simd_initialized = 1;
 
-    fprintf(stderr, "[SIMD] Detected ISA: ");
-    switch (g_simd_isa) {
-        case SIMD_AVX512: fprintf(stderr, "AVX-512 (512-bit)\n"); break;
-        case SIMD_AVX2:   fprintf(stderr, "AVX2 (256-bit)\n"); break;
-        case SIMD_AVX:    fprintf(stderr, "AVX (256-bit)\n"); break;
-        case SIMD_SSE2:   fprintf(stderr, "SSE2 (128-bit)\n"); break;
-        case SIMD_NEON:   fprintf(stderr, "NEON (128-bit)\n"); break;
-        case SIMD_OPENMP: fprintf(stderr, "OpenMP SIMD (compiler)\n"); break;
-        default:          fprintf(stderr, "None (scalar)\n"); break;
-    }
+    // Silent detection - ISA info available via simd_info() function
 }
 
 /**

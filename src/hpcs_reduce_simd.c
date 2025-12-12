@@ -382,8 +382,7 @@ void hpcs_register_simd_reduction_kernels(void) {
     // Register OpenMP SIMD versions (work on all platforms)
     hpcs_register_reduce_sum_kernel(SIMD_OPENMP, reduce_sum_openmp_simd);
     hpcs_register_reduce_mean_kernel(SIMD_OPENMP, reduce_mean_openmp_simd);
-
-    fprintf(stderr, "[SIMD] Registered OpenMP SIMD reduction kernels\n");
+    // Silent registration - removed debug output
 }
 
 // ============================================================================
