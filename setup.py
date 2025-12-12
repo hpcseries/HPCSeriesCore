@@ -83,6 +83,7 @@ library_dirs = [
 libraries = [
     "hpcs_core",  # Our static library
     "gfortran",   # Fortran runtime
+    "stdc++",     # C++ standard library (needed for SIMD kernels)
     "m",          # Math library
 ]
 

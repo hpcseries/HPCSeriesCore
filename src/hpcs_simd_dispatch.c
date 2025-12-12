@@ -179,6 +179,39 @@ const char* hpcs_get_simd_name(void) {
     }
 }
 
+/**
+ * Get L1 cache size in KB
+ */
+int hpcs_get_l1_cache_size_kb(void) {
+    hpcs_cpu_info_t cpu_info;
+    memset(&cpu_info, 0, sizeof(cpu_info));
+    hpcs_cpu_detect_init();
+    hpcs_cpu_detect_enhanced(&cpu_info);
+    return cpu_info.l1_cache_size_kb;
+}
+
+/**
+ * Get L2 cache size in KB
+ */
+int hpcs_get_l2_cache_size_kb(void) {
+    hpcs_cpu_info_t cpu_info;
+    memset(&cpu_info, 0, sizeof(cpu_info));
+    hpcs_cpu_detect_init();
+    hpcs_cpu_detect_enhanced(&cpu_info);
+    return cpu_info.l2_cache_size_kb;
+}
+
+/**
+ * Get optimal number of threads
+ */
+int hpcs_get_optimal_threads(void) {
+    hpcs_cpu_info_t cpu_info;
+    memset(&cpu_info, 0, sizeof(cpu_info));
+    hpcs_cpu_detect_init();
+    hpcs_cpu_detect_enhanced(&cpu_info);
+    return cpu_info.optimal_threads;
+}
+
 // ============================================================================
 // SIMD Kernel Function Pointers (for runtime dispatch)
 // ============================================================================

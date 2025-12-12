@@ -22,7 +22,12 @@ sphinx>=5.0
 sphinx-rtd-theme
 nbsphinx
 
-# Examples (optional)
+# Examples & Notebooks (optional)
 jupyter
 matplotlib
 pandas
+seaborn>=0.12
+scikit-learn>=1.0
+
+# Kaggle Competition Support (optional)
+xgboost>=2.0

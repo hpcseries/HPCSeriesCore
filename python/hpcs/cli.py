@@ -138,15 +138,48 @@ def cmd_config(args):
 
 def cmd_calibrate(args):
     """Run auto-tuning calibration."""
+    import os
+
     print("=== HPCSeries Auto-Tuning Calibration ===\n")
     print("This will benchmark optimal parallelization thresholds for your system.")
     print()
 
-    # TODO: Call C calibration functions when available
-    print("Calibration feature coming soon in v0.7.1")
-    print("Currently available via C binary: ./build/calibration_demo")
+    # Determine calibration mode
+    quick = args.quick if hasattr(args, 'quick') else False
+    mode_str = "quick" if quick else "full"
+    time_estimate = "5-10 seconds" if quick else "30-60 seconds"
 
-    return 0
+    print(f"Mode: {mode_str} calibration")
+    print(f"Estimated time: {time_estimate}")
+    print()
+    print("Running benchmarks...")
+
+    try:
+        # Run calibration
+        start = time.perf_counter()
+        hpcs.calibrate(quick=quick)
+        elapsed = time.perf_counter() - start
+
+        print(f"✓ Calibration completed in {elapsed:.1f}s\n")
+
+        # Save configuration
+        config_dir = os.path.expanduser("~/.hpcs")
+        config_path = os.path.join(config_dir, "config.json")
+
+        # Create directory if it doesn't exist
+        os.makedirs(config_dir, exist_ok=True)
+
+        hpcs.save_calibration_config(config_path)
+        print(f"✓ Configuration saved to: {config_path}")
+        print()
+        print("Calibration complete! Optimal thresholds have been determined.")
+        print("These will be used automatically in future sessions.")
+
+        return 0
+
+    except Exception as e:
+        print(f"✗ Calibration failed: {e}")
+        return 1
 
 
 def cmd_test(args):
@@ -260,6 +293,7 @@ def main():
 
     # calibrate command
     parser_calibrate = subparsers.add_parser('calibrate', help='Run auto-tuning calibration')
+    parser_calibrate.add_argument('--quick', action='store_true', help='Quick calibration (faster, less accurate)')
     parser_calibrate.set_defaults(func=cmd_calibrate)
 
     # test command

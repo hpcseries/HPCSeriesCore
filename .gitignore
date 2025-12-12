@@ -48,3 +48,70 @@ logs/tests/**/*.log
 *.md
 *.pdf
 .claude/
+
+# Python
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+.env
+virtualenv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Cython generated files
+*.c
+*.cpp
+!src/**/*.c
+!src/**/*.cpp
+
+# Python distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Python testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Large data files - ignore specific large kaggle files
+notebooks/data/kaggle/train.csv
+notebooks/data/kaggle/test.csv
+notebooks/data/kaggle/transactions.csv
+
+# Model files and submissions can be large
+notebooks/models/*.json
+notebooks/submissions/*.csv

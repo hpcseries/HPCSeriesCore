@@ -130,6 +130,7 @@ set(HPCS_CORE_SOURCES
     src/hpcs_zscore_simd.c             # SIMD z-score normalization
     src/hpcs_simd_align.c              # Memory alignment utilities
     src/hpcs_fortran_simd_bridge.c     # Fortran-SIMD integration bridge
+    src/hpcs_axis_simd.c               # SIMD axis operations (architecture-aware)
     src/fortran/hpcs_core_batched.f90
     src/fortran/hpcs_core_masked.f90
     src/fortran/hpcs_core_axis.f90
@@ -332,4 +333,14 @@ if(BUILD_BENCHMARKS)
     add_executable(test_fortran_simd examples/test_fortran_simd.c)
     target_link_libraries(test_fortran_simd hpcs_core OpenMP::OpenMP_C)
     target_include_directories(test_fortran_simd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # Axis operations benchmark: Fortran OpenMP vs C SIMD comparison (v0.6)
+    add_executable(bench_axis_comparison examples/bench_axis_comparison.c)
+    target_link_libraries(bench_axis_comparison hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(bench_axis_comparison PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # Prefetch optimization benchmark (v0.6 - Microarchitecture Opt)
+    add_executable(bench_prefetch bench/bench_prefetch.c)
+    target_link_libraries(bench_prefetch hpcs_core OpenMP::OpenMP_C)
+    target_include_directories(bench_prefetch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()

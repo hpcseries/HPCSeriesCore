@@ -17,7 +17,6 @@
 ! Error codes:
 !   HPCS_SUCCESS          : 0  (successful completion)
 !   HPCS_ERR_INVALID_ARGS : 1  (invalid input arguments)
-!   HPCS_ERR_NUMERIC_FAIL : 2  (degenerate numeric condition, e.g. MAD ≈ 0)
 !
 ! Dependencies:
 !   - hpcs_constants      : shared status codes
@@ -128,10 +127,10 @@ contains
   !
   ! Compute the median absolute deviation (MAD) of a 1-D array.  The MAD is
   ! defined as the median of the absolute deviations from the median of the
-  ! input.  A MAD smaller than approximately 1e-12 is considered degenerate
-  ! and triggers status = HPCS_ERR_NUMERIC_FAIL.  NaNs in the input propagate
-  ! to the result (mad = NaN, status = success).  Uses hpcs_median for
-  ! computing both the median of x and the median of deviations.
+  ! input.  MAD = 0 is a valid result for constant data (all same values).
+  ! NaNs in the input propagate to the result (mad = NaN, status = success).
+  ! Uses hpcs_median for computing both the median of x and the median of
+  ! deviations.
   !
   ! Arguments (C view):
   !   x   - const double*      input array of length n
@@ -142,7 +141,6 @@ contains
   ! Status codes:
   !   HPCS_SUCCESS          (0) : success
   !   HPCS_ERR_INVALID_ARGS (1) : n <= 0
-  !   HPCS_ERR_NUMERIC_FAIL (2) : MAD ≈ 0 (degenerate distribution)
   !--------------------------------------------------------------------------
   subroutine hpcs_mad(x, n, mad, status) bind(C, name="hpcs_mad")
     use iso_c_binding, only: c_int, c_double
@@ -206,12 +204,8 @@ contains
       return
     end if
 
-    ! Degeneracy check: MAD approximately zero
-    if (mad < 1.0e-12_c_double) then
-      status = HPCS_ERR_NUMERIC_FAIL
-    else
-      status = HPCS_SUCCESS
-    end if
+    ! MAD computed successfully (MAD = 0 is valid for constant data)
+    status = HPCS_SUCCESS
     deallocate(dev)
   end subroutine hpcs_mad
 

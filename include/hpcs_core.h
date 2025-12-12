@@ -345,6 +345,24 @@ void hpcs_rolling_mad(
     int          *status
 );
 
+/* Rolling Z-Score: Compute rolling (x - mean) / std within sliding window (v0.7) */
+void hpcs_rolling_zscore(
+    const double *x,
+    int           n,
+    int           window,
+    double       *y,
+    int          *status
+);
+
+/* Rolling Robust Z-Score: Compute rolling MAD-based z-score within sliding window (v0.7) */
+void hpcs_rolling_robust_zscore(
+    const double *x,
+    int           n,
+    int           window,
+    double       *y,
+    int          *status
+);
+
 /* ----------------------------------------------------------------------------
  * C. Data Quality: Clipping and Winsorization
  * -------------------------------------------------------------------------- */
@@ -827,6 +845,108 @@ void hpcs_print_simd_status(void);
 void hpcs_simd_reductions_init(void);
 void hpcs_rolling_simd_init(void);
 void hpcs_zscore_simd_init(void);
+
+/* ============================================================================
+ * v0.7: 2D AXIS OPERATIONS (C SIMD)
+ * ============================================================================
+ * SIMD-accelerated 2D array operations along specified axes.
+ * These complement the Fortran axis operations with C/SIMD implementations.
+ * ========================================================================== */
+
+/* Axis-0 Min: Compute minimum along rows (per column) of 2D array (v0.7)
+ *
+ * For a column-major 2D array x[n,m], computes y[j] = min(x[:,j]) for each column.
+ *
+ * Parameters:
+ *   x      - Input 2D array in column-major order
+ *   n      - Number of rows
+ *   m      - Number of columns
+ *   y      - Output: min per column [m]
+ *   status - 0=success, 1=invalid args
+ */
+void hpcs_reduce_min_axis0_simd(
+    const double *x,
+    int           n,
+    int           m,
+    double       *y,
+    int          *status
+);
+
+/* Axis-0 Max: Compute maximum along rows (per column) of 2D array (v0.7)
+ *
+ * For a column-major 2D array x[n,m], computes y[j] = max(x[:,j]) for each column.
+ *
+ * Parameters:
+ *   x      - Input 2D array in column-major order
+ *   n      - Number of rows
+ *   m      - Number of columns
+ *   y      - Output: max per column [m]
+ *   status - 0=success, 1=invalid args
+ */
+void hpcs_reduce_max_axis0_simd(
+    const double *x,
+    int           n,
+    int           m,
+    double       *y,
+    int          *status
+);
+
+/* ============================================================================
+ * v0.7: AUTO-TUNING CALIBRATION (v0.5)
+ * ============================================================================
+ * Benchmark-based auto-tuning system for optimal parallelization thresholds.
+ * Measures performance at various array sizes to find serial/parallel crossover
+ * points for different operation classes.
+ * ========================================================================== */
+
+/* Run full calibration benchmark
+ *
+ * Performs comprehensive benchmarking across all operation classes:
+ * - Simple reductions (sum, mean, min, max)
+ * - Rolling window operations
+ * - Robust statistics (median, MAD)
+ * - Anomaly detection
+ *
+ * Determines optimal parallelization thresholds and stores in global config.
+ * Takes 30-60 seconds depending on CPU.
+ *
+ * Parameters:
+ *   status - 0=success, 1=error
+ */
+void hpcs_calibrate(int *status);
+
+/* Run quick calibration benchmark (faster, less accurate)
+ *
+ * Performs reduced benchmarking with fewer sizes and trials.
+ * Suitable for quick testing or resource-constrained environments.
+ * Takes 5-10 seconds.
+ *
+ * Parameters:
+ *   status - 0=success, 1=error
+ */
+void hpcs_calibrate_quick(int *status);
+
+/* Save calibration configuration to file
+ *
+ * Exports current tuning thresholds to JSON configuration file.
+ * Typical location: $HOME/.hpcs/config.json
+ *
+ * Parameters:
+ *   path   - Configuration file path
+ *   status - 0=success, 1=error (e.g., permission denied)
+ */
+void hpcs_save_config(const char *path, int *status);
+
+/* Load calibration configuration from file
+ *
+ * Imports tuning thresholds from JSON configuration file.
+ * Applies thresholds to all subsequent operations.
+ *
+ * Parameters:
+ *   path   - Configuration file path
+ *   status - 0=success, 1=error (e.g., file not found)
+ */
+void hpcs_load_config(const char *path, int *status);
 
 #ifdef __cplusplus
 }

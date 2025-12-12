@@ -45,13 +45,50 @@ from hpcs._core import (
     # Robust statistics
     median,
     mad,
+    quantile,
+
+    # Transforms & normalization
+    zscore,
+    robust_zscore,
+    normalize_minmax,
+    clip,
+
+    # Anomaly detection
+    detect_anomalies,
+    detect_anomalies_robust,
 
     # Rolling operations
+    rolling_sum,
     rolling_mean,
     rolling_std,
     rolling_var,
     rolling_median,
     rolling_mad,
+    rolling_zscore,
+    rolling_robust_zscore,
+
+    # 2D Axis operations (Tier B)
+    axis_sum,
+    axis_mean,
+    axis_median,
+    axis_mad,
+    axis_min,
+    axis_max,
+
+    # Anomaly detection - axis operations
+    anomaly_axis,
+    anomaly_robust_axis,
+
+    # Batched/Masked rolling operations
+    rolling_mean_batched,
+    rolling_mean_masked,
+
+    # Masked operations (Tier B)
+    sum_masked,
+    mean_masked,
+    var_masked,
+    median_masked,
+    mad_masked,
 )
 
 # Import SIMD-specific functions
@@ -59,6 +96,13 @@ from hpcs._simd import (
     simd_info,
     get_simd_width,
     get_cpu_info,
+)
+
+# Import calibration functions
+from hpcs._core import (
+    calibrate,
+    save_calibration_config,
+    load_calibration_config,
 )
 
 # Public API
@@ -77,16 +121,58 @@ __all__ = [
     # Robust stats
     "median",
     "mad",
+    "quantile",
+
+    # Transforms & normalization
+    "zscore",
+    "robust_zscore",
+    "normalize_minmax",
+    "clip",
+
+    # Anomaly detection
+    "detect_anomalies",
+    "detect_anomalies_robust",
 
     # Rolling operations
+    "rolling_sum",
     "rolling_mean",
     "rolling_std",
     "rolling_var",
     "rolling_median",
     "rolling_mad",
+    "rolling_zscore",
+    "rolling_robust_zscore",
+
+    # 2D Axis operations (Tier B)
+    "axis_sum",
+    "axis_mean",
+    "axis_median",
+    "axis_mad",
+    "axis_min",
+    "axis_max",
+
+    # Anomaly detection - axis operations
+    "anomaly_axis",
+    "anomaly_robust_axis",
+
+    # Batched/Masked rolling operations
+    "rolling_mean_batched",
+    "rolling_mean_masked",
+
+    # Masked operations (Tier B)
+    "sum_masked",
+    "mean_masked",
+    "var_masked",
+    "median_masked",
+    "mad_masked",
 
     # SIMD info
     "simd_info",
     "get_simd_width",
     "get_cpu_info",
+
+    # Calibration
+    "calibrate",
+    "save_calibration_config",
+    "load_calibration_config",
 ]
