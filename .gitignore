@@ -57,6 +57,7 @@ ENV/
 .venv
 .env
 virtualenv/
+test-env/
 
 # Python bytecode
 __pycache__/

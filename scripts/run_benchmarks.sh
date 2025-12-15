@@ -75,15 +75,40 @@ run_benchmark() {
             echo "# Mode: $MODE"
             echo "# Timestamp: $(date -Iseconds)"
             echo "# Hostname: $(hostname)"
+
+            # Detect AWS instance metadata
+            if [ -f "$SCRIPT_DIR/detect_aws_instance.sh" ]; then
+                AWS_METADATA=$("$SCRIPT_DIR/detect_aws_instance.sh" 2>/dev/null || echo "not-ec2=true")
+                INSTANCE_TYPE=$(echo "$AWS_METADATA" | grep -o "instance-type=[^,]*" | cut -d= -f2 || echo "")
+                INSTANCE_FAMILY=$(echo "$AWS_METADATA" | grep -o "instance-family=[^,]*" | cut -d= -f2 || echo "")
+                if [ -n "$INSTANCE_TYPE" ]; then
+                    echo "# AWS Instance: $INSTANCE_TYPE"
+                    echo "# AWS Family: $INSTANCE_FAMILY"
+                fi
+            else
+                INSTANCE_TYPE=""
+                INSTANCE_FAMILY=""
+            fi
+
+            # Detect CPU architecture
+            VENDOR=$(grep -m1 "vendor_id" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
+            CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
+            HAS_AVX512=$(grep -m1 "^flags" /proc/cpuinfo 2>/dev/null | grep -q "avx512" && echo "yes" || echo "no")
+            echo "# CPU Vendor: $VENDOR"
+            echo "# CPU Model: $CPU_MODEL"
+            echo "# AVX-512: $HAS_AVX512"
+
             if [ "$MODE" = "gpu" ] && command -v nvidia-smi >/dev/null 2>&1; then
                 echo "# GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null)"
             fi
             echo "#"
 
-            # Run benchmark and add timestamp column
-            "$bench_exec" | awk -v ts="$(date -Iseconds)" '
-                NR==1 { print "timestamp,mode," $0 }
-                NR>1 { print ts ",'$MODE'," $0 }
+            # Run benchmark and add metadata columns
+            "$bench_exec" | awk -v ts="$(date -Iseconds)" \
+                -v itype="${INSTANCE_TYPE:-local}" \
+                -v ifam="${INSTANCE_FAMILY:-local}" '
+                NR==1 { print "timestamp,mode,instance_type,instance_family," $0 }
+                NR>1 { print ts ",'$MODE'," itype "," ifam "," $0 }
             '
         } > "$log_file"
 
@@ -104,6 +129,9 @@ echo "==========================================================================
 echo "Running Benchmarks"
 echo "============================================================================"
 echo ""
+
+# Run core benchmarks (v0.1/v0.2 baseline)
+run_benchmark "core" "./bench_core"
 
 # Run GPU acceleration benchmark (CPU vs GPU comparison)
 run_benchmark "gpu_acceleration" "./bench_gpu_acceleration"

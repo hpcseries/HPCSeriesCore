@@ -76,23 +76,28 @@ endif()
 # Enable position-independent code (required for Python extensions)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Compiler flags - aggressive optimization for performance + OpenMP
-# Note: Removed -ffast-math for Fortran to preserve IEEE 754 NaN handling for data utilities
+# Architecture-aware compiler flags
+# Detects CPU architecture and applies appropriate optimization flags
+# Supports SAFE (default, IEEE 754 compliant) and FAST (via HPCS_PROFILE=FAST) profiles
+include(cmake/DetectArchitecture.cmake)
+include(cmake/CompilerFlags.cmake)
+
+# Compiler flags - architecture-aware optimization + OpenMP
 # Note: -cpp flag enables preprocessing for #ifdef/#else/#endif directives in .f90 files
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -march=native ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp ${HPCS_COMPILER_FLAGS_FORTRAN} ${OpenMP_Fortran_FLAGS}")
     set(CMAKE_Fortran_FLAGS_DEBUG "-cpp -g -Wall -Wextra -pedantic -fbounds-check ${OpenMP_Fortran_FLAGS}")
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fpp -O3 -xHost -fp-model fast -ipo ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fpp ${HPCS_COMPILER_FLAGS_FORTRAN} -fp-model fast -ipo ${OpenMP_Fortran_FLAGS}")
     set(CMAKE_Fortran_FLAGS_DEBUG "-fpp -g -warn all -check all ${OpenMP_Fortran_FLAGS}")
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -Mpreprocess -O3 -fast ${OpenMP_Fortran_FLAGS}")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Mfree -Mpreprocess ${HPCS_COMPILER_FLAGS_FORTRAN} ${OpenMP_Fortran_FLAGS}")
     set(CMAKE_Fortran_FLAGS_DEBUG "-Mfree -Mpreprocess -g -Mbounds -Mchkptr -Mchkstk ${OpenMP_Fortran_FLAGS}")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -ffast-math -fno-math-errno -Wall -Wextra ${OpenMP_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native -ffast-math -fno-math-errno -Wall -Wextra ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${HPCS_COMPILER_FLAGS_CXX} -Wall -Wextra ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${HPCS_COMPILER_FLAGS_C} -Wall -Wextra ${OpenMP_C_FLAGS}")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /fp:fast /W4 ${OpenMP_CXX_FLAGS}")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /fp:fast /W4 ${OpenMP_C_FLAGS}")
