@@ -72,6 +72,9 @@ __pycache__/
 *.cpp
 !src/**/*.c
 !src/**/*.cpp
+!examples/**/*.c
+!bench/**/*.c
+!bench/**/*.cpp
 
 # Python distribution / packaging
 *.egg
