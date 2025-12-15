@@ -90,9 +90,55 @@ run_benchmark() {
                 INSTANCE_FAMILY=""
             fi
 
-            # Detect CPU architecture
+            # Detect CPU architecture (handle both x86 and ARM)
             VENDOR=$(grep -m1 "vendor_id" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
             CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
+
+            # ARM systems use different field names
+            if [ -z "$VENDOR" ] || [ -z "$CPU_MODEL" ]; then
+                # Try ARM-specific fields
+                ARCH=$(uname -m)
+                if [[ "$ARCH" =~ ^(aarch64|arm64) ]]; then
+                    VENDOR="ARM"
+                    # Get CPU part and implementer
+                    CPU_IMPL=$(grep -m1 "CPU implementer" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
+                    CPU_PART=$(grep -m1 "CPU part" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
+                    CPU_VAR=$(grep -m1 "CPU variant" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
+
+                    # Decode common ARM implementations
+                    case "$CPU_IMPL" in
+                        0x41) VENDOR="ARM" ;;
+                        0x42) VENDOR="Broadcom" ;;
+                        0x43) VENDOR="Cavium" ;;
+                        0x44) VENDOR="DEC" ;;
+                        0x4e) VENDOR="Nvidia" ;;
+                        0x50) VENDOR="APM" ;;
+                        0x51) VENDOR="Qualcomm" ;;
+                        0x53) VENDOR="Samsung" ;;
+                        0x56) VENDOR="Marvell" ;;
+                        *) VENDOR="ARM (0x${CPU_IMPL})" ;;
+                    esac
+
+                    # Try to get CPU architecture name
+                    CPU_ARCH=$(grep -m1 "CPU architecture" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "")
+
+                    # Build model string
+                    if [ -n "$CPU_PART" ]; then
+                        CPU_MODEL="Part 0x${CPU_PART} (ARMv${CPU_ARCH})"
+
+                        # Identify common ARM cores
+                        case "$CPU_PART" in
+                            0x0d0c) CPU_MODEL="Neoverse N1" ;;
+                            0x0d40) CPU_MODEL="Neoverse V1" ;;
+                            0x0d49) CPU_MODEL="Neoverse N2" ;;
+                            0x0d4f) CPU_MODEL="Neoverse V2" ;;
+                        esac
+                    else
+                        CPU_MODEL="ARMv${CPU_ARCH}"
+                    fi
+                fi
+            fi
+
             HAS_AVX512=$(grep -m1 "^flags" /proc/cpuinfo 2>/dev/null | grep -q "avx512" && echo "yes" || echo "no")
             echo "# CPU Vendor: $VENDOR"
             echo "# CPU Model: $CPU_MODEL"
