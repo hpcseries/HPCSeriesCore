@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(HPCSeriesCore
-    VERSION 0.4.0
+    VERSION 0.7.0
     DESCRIPTION "High-Performance Computing Series Core Library"
     LANGUAGES C CXX Fortran
 )

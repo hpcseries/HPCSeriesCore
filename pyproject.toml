@@ -61,10 +61,10 @@ examples = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hpcseries/core"
+Homepage = "https://github.com/hpcseries/HPCSeriesCore"
 Documentation = "https://hpcseries.readthedocs.io"
-Repository = "https://github.com/hpcseries/core"
-Changelog = "https://github.com/hpcseries/core/blob/main/CHANGELOG.md"
+Repository = "https://github.com/hpcseries/HPCSeriesCore"
+Changelog = "https://github.com/hpcseries/HPCSeriesCore/blob/main/CHANGELOG.md"
 
 [project.scripts]
 hpcs = "hpcs.cli:main"
