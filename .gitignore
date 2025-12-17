@@ -49,6 +49,8 @@ logs/tests/**/*.log
 !logs/README.md
 
 *.md
+!README.md
+!CHANGELOG.md
 !docs/PERFORMANCE.md
 !docs/PERFORMANCE_SUMMARY.md
 !docs/AWS_DEPLOYMENT_GUIDE.md
