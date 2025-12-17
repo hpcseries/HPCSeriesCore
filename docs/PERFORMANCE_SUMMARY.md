@@ -29,11 +29,11 @@ export OMP_NUM_THREADS=2       # Optimal for all tested platforms
 |------------|----------|-----------|-----------|-------------------|
 | **AMD EPYC Genoa** | c7a.xlarge | 296 ms | 313 ms | **+5.8% slower** ⚠️ |
 | **ARM Graviton3** | c7g.xlarge | 267 ms | 278 ms | **+4.0% slower** ⚠️ |
-| **Intel Ice Lake** | m6i.2xlarge | 306 ms | 297 ms | -3.2% faster* |
-
-*Intel shows crossover: 4 threads is slower for small data (≤1M), slightly faster for large data (≥5M)
+| **Intel Ice Lake** | m6i.2xlarge | 307 ms | 322 ms | **+5.0% slower** ⚠️ |
 
 **Operation measured:** MAD (Median Absolute Deviation) - representative memory-bound kernel
+
+**Universal finding:** 2 threads is optimal across all architectures tested
 
 ---
 
@@ -59,10 +59,9 @@ This is **textbook roofline behavior** and proves HPCSeries reaches optimal memo
 - 4-6% degradation with 4 threads across all workloads
 
 ### Intel Ice Lake / Sapphire Rapids (AWS c6i, c7i, m6i)
-✅ **OMP_NUM_THREADS=2** (conservative, works for all sizes)
-⚠️ **OMP_NUM_THREADS=4** (only if typical workload is >5M elements)
-- Small data (≤1M): 5-14% degradation with 4 threads
-- Large data (≥5M): 2-4% improvement with 4 threads
+✅ **OMP_NUM_THREADS=2** (mandatory)
+- 5-10% degradation with 4 threads across all workloads
+- Same memory bandwidth saturation pattern as AMD/ARM
 
 ---
 

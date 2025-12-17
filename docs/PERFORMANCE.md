@@ -216,21 +216,24 @@ Across all architectures, **reduction operations saturate memory bandwidth with 
 **Workload:** v03_optimized benchmark
 **Comparison:** 2 threads vs 4 threads
 
-| Operation | Dataset | 2 Threads (ms) | 4 Threads (ms) | Change |
-|-----------|---------|----------------|----------------|--------|
-| MEDIAN | 100k | 1.41 | 1.61 | **+12.4%** (4T slower) |
-| MEDIAN | 500k | 3.81 | 4.16 | **+8.4%** (4T slower) |
-| MEDIAN | 10M | 135.96 | 131.02 | **-3.8%** (4T faster) |
-| QUANTILE | 100k | 1.09 | 1.27 | **+14.0%** (4T slower) |
-| QUANTILE | 10M | 145.86 | 142.59 | **-2.3%** (4T faster) |
-| ROBUST_ZSCORE | 500k | 15.79 | 17.03 | **+7.3%** (4T slower) |
-| ROBUST_ZSCORE | 10M | 446.59 | 436.13 | **-2.4%** (4T faster) |
+| Operation | Dataset | 2 Threads (ms) | 4 Threads (ms) | Degradation |
+|-----------|---------|----------------|----------------|-------------|
+| MAD | 500k | 12.18 | 12.27 | +0.8% |
+| MAD | 5M | 160.60 | 170.31 | **+6.0%** ⚠️ |
+| MAD | 10M | 306.52 | 321.81 | **+5.0%** ⚠️ |
+| MEDIAN | 500k | 3.81 | 4.20 | **+10.2%** ⚠️ |
+| MEDIAN | 10M | 135.96 | 144.48 | **+6.3%** ⚠️ |
+| QUANTILE | 5M | 58.49 | 62.93 | **+7.6%** ⚠️ |
+| QUANTILE | 10M | 145.86 | 154.56 | **+6.0%** ⚠️ |
+| ROBUST_ZSCORE | 10M | 446.59 | 472.51 | **+5.8%** ⚠️ |
+| ROLLING_MAD | 1M | 1264.25 | 1264.08 | ±0.0% |
+| ROLLING_MEDIAN | 1M | 388.64 | 389.43 | ±0.2% |
 
 **Interpretation:**
-- **Small datasets (≤1M):** 4 threads is **5-14% slower** (overhead dominates)
-- **Large datasets (≥5M):** 4 threads is **2-4% faster** (SMT helps slightly)
-- **Crossover behavior:** Thread count choice depends on dataset size
-- Optimal: **2 threads** (conservative), **4 threads** (large data only)
+- Reduction operations: **5-10% slower** with 4 threads for large datasets
+- Rolling operations: **No change** (±0.2%)
+- Pattern consistent with AMD and ARM architectures
+- Optimal: **2 threads**
 
 ---
 
@@ -270,13 +273,11 @@ ARM cores achieve high bandwidth efficiency per thread. Best throughput observed
 export OMP_DYNAMIC=false
 export OMP_PROC_BIND=true
 export OMP_PLACES=cores
-export OMP_NUM_THREADS=2  # Conservative (works for all sizes)
-# OR
-export OMP_NUM_THREADS=4  # Aggressive (large datasets >5M only)
+export OMP_NUM_THREADS=2
 ```
 
 **Rationale:**
-Intel's Hyper-Threading provides better SMT efficiency than AMD/ARM. Small datasets show 5-14% degradation with 4 threads, but large datasets (≥5M) see 2-4% improvement. Choose based on typical workload size.
+Intel Ice Lake shows the same memory bandwidth saturation pattern as AMD and ARM. Four threads introduce 5-10% degradation for large datasets due to cache contention and memory bus saturation. Two pinned threads deliver optimal throughput.
 
 ---
 
