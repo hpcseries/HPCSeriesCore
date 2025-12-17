@@ -1,0 +1,49 @@
+# MANIFEST.in - Controls which files are included in source distribution
+# Used by setuptools when building source distributions (sdist)
+
+# Include essential documentation
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CITATION.cff
+include CONTRIBUTING.md
+include SECURITY.md
+
+# Include build system files
+include pyproject.toml
+include setup.py
+include CMakeLists.txt
+
+# Include CMake modules (needed for building)
+recursive-include cmake *.cmake
+
+# Include C/Fortran source files
+recursive-include src *.c *.cpp *.h *.f90 *.F90
+recursive-include include *.h
+
+# Include Python package files
+recursive-include python *.py *.pyx *.pxd
+
+# Include test files
+recursive-include tests *.py *.c *.cpp *.f90
+
+# Include documentation
+recursive-include docs *.md *.rst
+prune docs/build
+
+# Include examples and benchmarks
+recursive-include examples *.c *.cpp *.f90
+recursive-include bench *.c *.cpp *.f90
+
+# Include scripts
+recursive-include scripts *.sh *.py
+
+# Exclude build artifacts
+global-exclude *.pyc *.pyo *.pyd __pycache__
+global-exclude *.so *.dll *.dylib *.o *.a
+global-exclude .DS_Store .git* .coverage
+prune build
+prune dist
+prune .pytest_cache
+prune .mypy_cache
+prune *.egg-info
