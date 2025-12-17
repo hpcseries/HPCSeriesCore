@@ -38,12 +38,28 @@ recursive-include bench *.c *.cpp *.f90
 # Include scripts
 recursive-include scripts *.sh *.py
 
-# Exclude build artifacts
+# IMPORTANT: Include pre-built native library (must be before excludes)
+# This is architecture-specific and must be built before packaging
+include build/libhpcs_core.a
+
+# Exclude build artifacts (but keep libhpcs_core.a included above)
 global-exclude *.pyc *.pyo *.pyd __pycache__
-global-exclude *.so *.dll *.dylib *.o *.a
+global-exclude *.so *.dll *.dylib *.o
 global-exclude .DS_Store .git* .coverage
-prune build
+
+# Exclude most of build directory but keep libhpcs_core.a
+prune build/CMakeFiles
+prune build/src
+prune build/tests
+prune build/bench
+exclude build/*.cmake
+exclude build/CMakeCache.txt
+exclude build/Makefile
+exclude build/compile_commands.json
+
+# Exclude other artifacts
 prune dist
 prune .pytest_cache
 prune .mypy_cache
 prune *.egg-info
+prune test-env

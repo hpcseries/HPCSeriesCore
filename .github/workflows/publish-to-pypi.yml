@@ -1,0 +1,92 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: read
+  id-token: write  # IMPORTANT: Required for trusted publishing
+
+jobs:
+  build-and-publish:
+    name: Build and publish Python package to PyPI
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          ninja-build \
+          gcc \
+          gfortran \
+          libopenblas-dev \
+          libomp-dev
+
+    - name: Build native library
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_TESTS=OFF \
+          -DBUILD_BENCHMARKS=OFF
+        cmake --build . --parallel $(nproc)
+        cd ..
+
+        # Verify library was built
+        ls -lh build/libhpcs_core.a
+
+    - name: Install Python build tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build Python packages
+      run: |
+        python -m build --wheel
+        python -m build --sdist
+
+    - name: Verify packages
+      run: |
+        ls -lh dist/
+        twine check dist/*
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        verbose: true
+        print-hash: true
+
+---
+# Configuration Notes:
+#
+# To enable Trusted Publishing on PyPI:
+# 1. Go to: https://pypi.org/manage/account/publishing/
+# 2. Add a new pending publisher with these details:
+#    - PyPI Project Name: hpcs
+#    - Owner: hpcseries
+#    - Repository name: HPCSeriesCore
+#    - Workflow name: publish-to-pypi.yml
+#    - Environment name: (leave empty)
+#
+# For TestPyPI (optional, for testing):
+# 1. Go to: https://test.pypi.org/manage/account/publishing/
+# 2. Add the same configuration
+#
+# After configuration, this workflow will automatically publish when:
+# - You create a GitHub release
+# - You manually trigger the workflow
+#
+# No API tokens needed! GitHub OIDC provides temporary credentials.

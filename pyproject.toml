@@ -13,7 +13,8 @@ version = "0.7.0"
 description = "CPU-optimized statistical computing library with SIMD vectorization and OpenMP parallelization for massive datasets (10M+ records)"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "HPCSeries Core Contributors"}
 ]
@@ -34,7 +35,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Intended Audience :: Financial and Insurance Industry",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
