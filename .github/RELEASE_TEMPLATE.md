@@ -1,6 +1,6 @@
 # HPCSeries Core v0.7.0 - Architecture-Aware Compilation & Performance Validation
 
-**Release Date:** 2025-12-15
+**Release Date:** 2025-12-17
 **Tag:** `v0.7.0`
 
 ---
