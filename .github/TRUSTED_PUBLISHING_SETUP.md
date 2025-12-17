@@ -2,6 +2,13 @@
 
 **Trusted Publishing** is PyPI's modern authentication system using OpenID Connect (OIDC). It's more secure than API tokens and is now the **recommended** publishing method.
 
+## 🆕 New: Manylinux Wheels Support
+
+HPCSeries Core now builds **manylinux wheels** for fast, no-compilation installation. The new workflow builds:
+- ✅ Pre-compiled wheels for Python 3.8-3.12 (x86_64)
+- ✅ Source distribution for custom builds
+- ✅ Both uploaded to PyPI together
+
 ## Why Use Trusted Publishing?
 
 ✅ **More Secure** - No long-lived API tokens in secrets
@@ -24,8 +31,8 @@
    PyPI Project Name: hpcs
    Owner: hpcseries
    Repository name: HPCSeriesCore
-   Workflow name: publish-to-pypi.yml
-   Environment name: (leave empty)
+   Workflow name: build-wheels.yml
+   Environment name: pypi
    ```
 4. Click **"Add"**
 
@@ -38,8 +45,8 @@
    PyPI Project Name: hpcs
    Owner: hpcseries
    Repository name: HPCSeriesCore
-   Workflow name: publish-to-test-pypi.yml
-   Environment name: (leave empty)
+   Workflow name: build-wheels.yml
+   Environment name: pypi-test
    ```
 4. Click **"Add"**
 
@@ -92,25 +99,26 @@ git push origin v0.7.0-test1
 
 ## Workflow Files
 
-Two GitHub Actions workflows are configured:
-
-### 1. Production PyPI
-**File:** `.github/workflows/publish-to-pypi.yml`
+### Manylinux Wheels Build (Recommended)
+**File:** `.github/workflows/build-wheels.yml`
 
 **Triggers:**
-- When you create a GitHub release
-- Manual trigger via GitHub Actions UI
+- Tags matching `v*.*.*` → Production PyPI
+- Tags matching `v*.*.*-test*` → TestPyPI
 
-**Publishes to:** https://pypi.org/project/hpcs/
+**What it builds:**
+- ✅ Manylinux wheels for Python 3.8-3.12 (x86_64)
+- ✅ Source distribution (sdist)
+- ✅ Fast installation, no build tools needed
 
-### 2. TestPyPI (Optional)
-**File:** `.github/workflows/publish-to-test-pypi.yml`
+**Publishes to:**
+- Production: https://pypi.org/project/hpcs/
+- Test: https://test.pypi.org/project/hpcs/
 
-**Triggers:**
-- When you push tags like `v0.7.0-test1`
-- Manual trigger via GitHub Actions UI
+### Legacy Workflows (Deprecated)
+**Files:** `publish-to-pypi.yml`, `publish-to-test-pypi.yml`
 
-**Publishes to:** https://test.pypi.org/project/hpcs/
+These workflows only build sdist (no wheels). Use `build-wheels.yml` instead.
 
 ---
 
