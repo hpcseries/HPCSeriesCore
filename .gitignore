@@ -36,6 +36,8 @@ Thumbs.db
 # Test outputs
 test_results/
 docs/*
+!docs/PERFORMANCE.md
+!docs/AWS_DEPLOYMENT_GUIDE.md
 
 # Logs (exclude runtime logs, keep reports)
 logs/benchmarks/*.csv
@@ -47,6 +49,8 @@ logs/tests/**/*.log
 !logs/README.md
 
 *.md
+!docs/PERFORMANCE.md
+!docs/AWS_DEPLOYMENT_GUIDE.md
 *.pdf
 .claude/
 

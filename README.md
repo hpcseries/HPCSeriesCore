@@ -326,6 +326,7 @@ See [Notebooks README](notebooks/README.md) for detailed descriptions.
 ### 🚀 Deployment
 
 - **[AWS Deployment Guide](docs/AWS_DEPLOYMENT_GUIDE.md)** - Production deployment on AWS EC2 (CPU-optimized instances)
+- **[Performance Methodology](docs/PERFORMANCE.md)** - Empirical benchmarks and thread scaling analysis
 
 ---
 
