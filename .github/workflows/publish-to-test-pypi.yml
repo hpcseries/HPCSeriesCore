@@ -3,17 +3,18 @@ name: Publish to TestPyPI
 on:
   push:
     tags:
-      - 'v*.*.*-test*'  # Trigger on test tags like v0.7.0-test1
-  workflow_dispatch:  # Allow manual trigger
+      - 'v*.*.*-test*'
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write  # IMPORTANT: Required for trusted publishing
+  id-token: write
 
 jobs:
   build-and-publish:
     name: Build and publish Python package to TestPyPI
     runs-on: ubuntu-latest
+    environment: pypi-test
 
     steps:
     - name: Checkout code
@@ -70,21 +71,3 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         verbose: true
         print-hash: true
-
----
-# Configuration Notes:
-#
-# To enable Trusted Publishing on TestPyPI:
-# 1. Go to: https://test.pypi.org/manage/account/publishing/
-# 2. Add a new pending publisher with these details:
-#    - PyPI Project Name: hpcs
-#    - Owner: hpcseries
-#    - Repository name: HPCSeriesCore
-#    - Workflow name: publish-to-test-pypi.yml
-#    - Environment name: (leave empty)
-#
-# To test this workflow:
-#   git tag v0.7.0-test1
-#   git push origin v0.7.0-test1
-#
-# Or manually trigger from GitHub Actions UI
