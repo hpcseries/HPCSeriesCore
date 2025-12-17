@@ -38,11 +38,7 @@ recursive-include bench *.c *.cpp *.f90
 # Include scripts
 recursive-include scripts *.sh *.py
 
-# IMPORTANT: Include pre-built native library (must be before excludes)
-# This is architecture-specific and must be built before packaging
-include build/libhpcs_core.a
-
-# Exclude build artifacts (but keep libhpcs_core.a included above)
+# Exclude build artifacts (native library will be built during installation)
 global-exclude *.pyc *.pyo *.pyd __pycache__
 global-exclude *.so *.dll *.dylib *.o
 global-exclude .DS_Store .git* .coverage

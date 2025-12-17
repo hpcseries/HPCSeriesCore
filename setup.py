@@ -5,160 +5,210 @@ HPCSeries Core - Python Package Build Configuration
 Builds Cython extensions linking to the native libhpcs_core library.
 
 Prerequisites:
-    - Build libhpcs_core.a first: cmake -S . -B build && cmake --build build
-    - Requires: gcc, gfortran, cmake, numpy, Cython>=3.0
+    - gcc, gfortran, cmake (automatically builds native library if missing)
+    - numpy, Cython>=3.0
 
 Build commands:
     python -m build              # Build wheel (recommended)
+    pip install .                # Install from source (auto-builds native lib)
     pip install -e .             # Editable install (development)
-    python setup.py build_ext    # Build extensions only
 
 Configuration is in pyproject.toml (PEP 517/518).
 """
 
 import os
+import subprocess
 import sys
 from pathlib import Path
-import numpy as np
-from setuptools import setup, Extension
+
+import numpy
 from Cython.Build import cythonize
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
-# Detect platform
-IS_LINUX = sys.platform.startswith('linux')
-IS_MACOS = sys.platform == 'darwin'
-IS_WINDOWS = sys.platform == 'win32'
 
-# Project root
-ROOT_DIR = Path(__file__).parent.absolute()
-BUILD_DIR = ROOT_DIR / "build"
-LIB_DIR = BUILD_DIR
+class BuildNativeLibrary(build_ext):
+    """Custom build command that builds the native library first."""
 
-# Find the compiled library
-if IS_LINUX:
-    LIB_NAME = "libhpcs_core.a"
-elif IS_MACOS:
-    LIB_NAME = "libhpcs_core.a"
-elif IS_WINDOWS:
-    raise RuntimeError(
-        "Windows is not officially supported in v0.7.0.\n"
-        "Consider using WSL2 (Windows Subsystem for Linux) or Docker."
-    )
-else:
-    raise RuntimeError(f"Unsupported platform: {sys.platform}")
+    def run(self):
+        """Build native library, then build Python extensions."""
+        # Check if native library exists, build if not
+        lib_path = Path("build/libhpcs_core.a")
 
-# Library path
-lib_path = LIB_DIR / LIB_NAME
-if not lib_path.exists():
-    error_msg = f"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║ ERROR: Native library not found                                         ║
-╚══════════════════════════════════════════════════════════════════════════╝
+        if not lib_path.exists():
+            print("\n" + "="*80)
+            print("Building native library (libhpcs_core.a)...")
+            print("="*80 + "\n")
 
-Missing: {lib_path}
+            # Check for required tools
+            self._check_build_tools()
 
-The HPCSeries Core Python package requires building the native library first.
+            # Build native library with CMake
+            self._build_native_library()
 
-Build instructions:
-    mkdir -p build && cd build
-    cmake .. -DCMAKE_BUILD_TYPE=Release
-    cmake --build . -j$(nproc)
-    cd ..
+            # Verify library was built
+            if not lib_path.exists():
+                raise RuntimeError(
+                    f"Native library build succeeded but {lib_path} not found!"
+                )
 
-Then retry: pip install -e .
+            print("\n" + "="*80)
+            print(f"✓ Native library built successfully: {lib_path}")
+            print("="*80 + "\n")
+        else:
+            print(f"✓ Native library found: {lib_path}")
 
-See: https://github.com/hpcseries/HPCSeriesCore#installation
-"""
-    print(error_msg, file=sys.stderr)
+        # Continue with normal extension building
+        super().run()
 
-    if BUILD_DIR.exists():
-        import subprocess
-        print(f"\nFiles found in {BUILD_DIR}:")
-        subprocess.run(["ls", "-lh", str(BUILD_DIR)])
+    def _check_build_tools(self):
+        """Check that cmake, gcc, and gfortran are available."""
+        required_tools = {
+            'cmake': 'CMake (https://cmake.org/)',
+            'gcc': 'GCC compiler',
+            'gfortran': 'GNU Fortran compiler'
+        }
 
-    raise FileNotFoundError(f"Required library not found: {lib_path}")
+        missing = []
+        for tool, description in required_tools.items():
+            try:
+                subprocess.run(
+                    [tool, '--version'],
+                    capture_output=True,
+                    check=True
+                )
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                missing.append(f"  - {tool}: {description}")
 
-# Compiler flags for Cython extensions
-# Note: These flags are used when compiling the Cython-generated C code,
-#       not the native library (which is pre-built via CMake)
-extra_compile_args = [
-    "-O3",                # Maximum optimization
-    "-march=native",      # CPU-specific optimizations (matches CMake)
-    "-fopenmp",           # OpenMP support
-    "-std=c11",           # C11 standard
-]
+        if missing:
+            error_msg = "\n".join([
+                "",
+                "╔══════════════════════════════════════════════════════════════════════════╗",
+                "║ ERROR: Missing required build tools                                     ║",
+                "╚══════════════════════════════════════════════════════════════════════════╝",
+                "",
+                "The following tools are required to build HPCSeries Core:",
+                "",
+                *missing,
+                "",
+                "Installation instructions:",
+                "",
+                "  Ubuntu/Debian:",
+                "    sudo apt-get install cmake gcc gfortran",
+                "",
+                "  Fedora/RHEL:",
+                "    sudo dnf install cmake gcc gcc-gfortran",
+                "",
+                "  macOS (Homebrew):",
+                "    brew install cmake gcc",
+                "",
+                "  Windows:",
+                "    Install Visual Studio with C++ support and CMake",
+                "    Or use WSL with Linux instructions",
+                "",
+            ])
+            raise RuntimeError(error_msg)
 
-extra_link_args = [
-    "-fopenmp",           # Link OpenMP runtime
-]
+    def _build_native_library(self):
+        """Build the native library using CMake."""
+        build_dir = Path("build")
+        build_dir.mkdir(exist_ok=True)
 
-if IS_MACOS:
-    # macOS-specific: Suppress Cython-generated warnings
-    extra_compile_args.extend([
-        "-Wno-unreachable-code-fallthrough",
-        "-Wno-deprecated-declarations",
-    ])
+        # Configure with CMake
+        cmake_args = [
+            'cmake',
+            '..',
+            '-DCMAKE_BUILD_TYPE=Release',
+            '-DBUILD_TESTS=OFF',
+            '-DBUILD_BENCHMARKS=OFF'
+        ]
 
-# Include directories
-include_dirs = [
-    str(ROOT_DIR / "include"),
-    str(ROOT_DIR / "src" / "fortran"),
-    np.get_include(),
-]
+        # Add Ninja generator if available (faster builds)
+        try:
+            subprocess.run(['ninja', '--version'], capture_output=True, check=True)
+            cmake_args.insert(1, '-G')
+            cmake_args.insert(2, 'Ninja')
+            print("Using Ninja build system (faster)")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("Using default build system (Ninja not available)")
 
-# Library directories
-library_dirs = [
-    str(LIB_DIR),
-]
+        print(f"Configuring: {' '.join(cmake_args)}")
+        subprocess.run(
+            cmake_args,
+            cwd=build_dir,
+            check=True
+        )
 
-# Libraries to link
-libraries = [
-    "hpcs_core",  # Our static library
-    "gfortran",   # Fortran runtime
-    "stdc++",     # C++ standard library (needed for SIMD kernels)
-    "m",          # Math library
-]
+        # Build
+        build_args = [
+            'cmake',
+            '--build', '.',
+            '--config', 'Release'
+        ]
 
-if IS_MACOS:
-    libraries.extend(["quadmath"])  # Required for gfortran on macOS
+        # Use parallel build
+        import multiprocessing
+        n_jobs = multiprocessing.cpu_count()
+        build_args.extend(['--parallel', str(n_jobs)])
 
-# Define Cython extensions
+        print(f"Building: {' '.join(build_args)}")
+        subprocess.run(
+            build_args,
+            cwd=build_dir,
+            check=True
+        )
+
+
+# Project root directory
+project_root = Path(__file__).parent.resolve()
+
+# Define extensions
 extensions = [
     Extension(
-        name="hpcs._core",
+        "hpcs._core",
         sources=["python/hpcs/_core.pyx"],
-        include_dirs=include_dirs,
-        library_dirs=library_dirs,
-        libraries=libraries,
-        extra_compile_args=extra_compile_args,
-        extra_link_args=extra_link_args,
+        include_dirs=[
+            str(project_root / "include"),
+            str(project_root / "src" / "fortran"),
+            numpy.get_include(),
+        ],
+        library_dirs=[str(project_root / "build")],
+        libraries=["hpcs_core", "gfortran", "stdc++", "m"],
+        extra_compile_args=["-O3", "-march=native", "-fopenmp", "-std=c11"],
+        extra_link_args=["-fopenmp"],
         language="c",
     ),
     Extension(
-        name="hpcs._simd",
+        "hpcs._simd",
         sources=["python/hpcs/_simd.pyx"],
-        include_dirs=include_dirs,
-        library_dirs=library_dirs,
-        libraries=libraries,
-        extra_compile_args=extra_compile_args,
-        extra_link_args=extra_link_args,
+        include_dirs=[
+            str(project_root / "include"),
+            str(project_root / "src" / "fortran"),
+            numpy.get_include(),
+        ],
+        library_dirs=[str(project_root / "build")],
+        libraries=["hpcs_core", "gfortran", "stdc++", "m"],
+        extra_compile_args=["-O3", "-march=native", "-fopenmp", "-std=c11"],
+        extra_link_args=["-fopenmp"],
         language="c",
     ),
 ]
 
-# Cythonize with compiler directives
-ext_modules = cythonize(
+# Cythonize extensions
+cythonized_extensions = cythonize(
     extensions,
     compiler_directives={
         "language_level": "3",
-        "boundscheck": False,  # Disable bounds checking for performance
-        "wraparound": False,   # Disable negative indexing
-        "cdivision": True,     # C-style division (faster)
-        "initializedcheck": False,  # Skip initialization checks
-        "embedsignature": True,  # Include signatures in docstrings
+        "boundscheck": False,
+        "wraparound": False,
+        "cdivision": True,
     },
-    annotate=False,  # Set to True to generate HTML annotation files
 )
 
+# Setup
 setup(
-    ext_modules=ext_modules,
+    ext_modules=cythonized_extensions,
+    cmdclass={
+        'build_ext': BuildNativeLibrary,
+    },
 )

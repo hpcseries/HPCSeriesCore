@@ -3,16 +3,17 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write  # IMPORTANT: Required for trusted publishing
+  id-token: write
 
 jobs:
   build-and-publish:
     name: Build and publish Python package to PyPI
     runs-on: ubuntu-latest
+    environment: pypi
 
     steps:
     - name: Checkout code
@@ -55,7 +56,8 @@ jobs:
 
     - name: Build Python packages
       run: |
-        python -m build --wheel
+        # Build source distribution only
+        # Wheels need manylinux tagging (PEP 600) - use cibuildwheel in future
         python -m build --sdist
 
     - name: Verify packages
@@ -68,25 +70,3 @@ jobs:
       with:
         verbose: true
         print-hash: true
-
----
-# Configuration Notes:
-#
-# To enable Trusted Publishing on PyPI:
-# 1. Go to: https://pypi.org/manage/account/publishing/
-# 2. Add a new pending publisher with these details:
-#    - PyPI Project Name: hpcs
-#    - Owner: hpcseries
-#    - Repository name: HPCSeriesCore
-#    - Workflow name: publish-to-pypi.yml
-#    - Environment name: (leave empty)
-#
-# For TestPyPI (optional, for testing):
-# 1. Go to: https://test.pypi.org/manage/account/publishing/
-# 2. Add the same configuration
-#
-# After configuration, this workflow will automatically publish when:
-# - You create a GitHub release
-# - You manually trigger the workflow
-#
-# No API tokens needed! GitHub OIDC provides temporary credentials.
