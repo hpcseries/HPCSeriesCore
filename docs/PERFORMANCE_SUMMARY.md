@@ -25,15 +25,18 @@ export OMP_NUM_THREADS=2       # Optimal for all tested platforms
 
 ## Thread Scaling Results (10M elements)
 
-| CPU Family | Instance | 2 Threads | 4 Threads | Performance Change |
-|------------|----------|-----------|-----------|-------------------|
-| **AMD EPYC Genoa** | c7a.xlarge | 296 ms | 313 ms | **+5.8% slower** ⚠️ |
-| **ARM Graviton3** | c7g.xlarge | 267 ms | 278 ms | **+4.0% slower** ⚠️ |
-| **Intel Ice Lake** | m6i.2xlarge | 307 ms | 322 ms | **+5.0% slower** ⚠️ |
+| CPU Family | Instance | vCPUs | 2 Threads | 4 Threads | Performance Change |
+|------------|----------|-------|-----------|-----------|-------------------|
+| **AMD EPYC Genoa** | c7a.xlarge | 4 | 296 ms | 313 ms | **+5.8% slower** ⚠️ |
+| **ARM Graviton3** | c7g.xlarge | 4 | 267 ms | 278 ms | **+4.0% slower** ⚠️ |
+| **Intel Ice Lake** | m6i.2xlarge | 8 | 307 ms | 322 ms | **+5.0% slower** ⚠️ |
+| **Intel Ice Lake** | c6i.4xlarge | 16 | 299 ms | 317 ms | **+6.1% slower** ⚠️ |
 
 **Operation measured:** MAD (Median Absolute Deviation) - representative memory-bound kernel
 
-**Universal finding:** 2 threads is optimal across all architectures tested
+**Universal finding:** 2 threads is optimal across all architectures and instance sizes tested
+
+**Critical insight:** Thread count is independent of vCPU count (2 threads optimal for 4, 8, and 16 vCPU instances)
 
 ---
 

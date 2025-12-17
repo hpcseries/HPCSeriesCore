@@ -235,6 +235,43 @@ Across all architectures, **reduction operations saturate memory bandwidth with 
 - Pattern consistent with AMD and ARM architectures
 - Optimal: **2 threads**
 
+### Intel Ice Lake (c6i.4xlarge)
+
+**Workload:** v03_optimized benchmark
+**Comparison:** 2 threads vs 4 threads
+**Instance Size:** 16 vCPUs (8 physical cores + SMT)
+
+| Operation | Dataset | 2 Threads (ms) | 4 Threads (ms) | Degradation |
+|-----------|---------|----------------|----------------|-------------|
+| MAD | 5M | 156.61 | 164.88 | **+5.3%** ⚠️ |
+| MAD | 10M | 298.54 | 316.78 | **+6.1%** ⚠️ |
+| MEDIAN | 500k | 3.79 | 4.16 | **+9.9%** ⚠️ |
+| MEDIAN | 10M | 132.54 | 142.24 | **+7.3%** ⚠️ |
+| QUANTILE | 5M | 57.31 | 60.87 | **+6.2%** ⚠️ |
+| QUANTILE | 10M | 143.40 | 152.89 | **+6.6%** ⚠️ |
+| ROBUST_ZSCORE | 5M | 214.41 | 231.27 | **+7.9%** ⚠️ |
+| ROBUST_ZSCORE | 10M | 435.16 | 466.53 | **+7.2%** ⚠️ |
+| ROLLING_MAD | 1M | 1266.03 | 1270.78 | +0.4% |
+| ROLLING_MEDIAN | 1M | 389.48 | 388.95 | -0.1% |
+
+**Interpretation:**
+- Reduction operations: **5-8% slower** with 4 threads for large datasets
+- Rolling operations: **No change** (±0.4%)
+- **Critical finding:** Pattern identical to m6i.2xlarge despite having 2x vCPUs (16 vs 8)
+- **Proof of memory bandwidth limit:** More vCPUs don't help when memory is saturated
+- Optimal: **2 threads**
+
+### Intel Ice Lake Cross-Instance Validation
+
+**Key Insight:** Thread scaling behavior is **independent of vCPU count**
+
+| Instance | vCPUs | Physical Cores | Optimal Threads | Degradation with 4T |
+|----------|-------|----------------|-----------------|---------------------|
+| m6i.2xlarge | 8 | 4 + SMT | **2** | 5-10% slower |
+| c6i.4xlarge | 16 | 8 + SMT | **2** | 5-8% slower |
+
+This proves the performance limitation is **memory bandwidth**, not CPU cores. Whether you have 8 or 16 vCPUs available, 2 threads saturate the memory subsystem.
+
 ---
 
 ## Recommended Configuration by CPU Family
