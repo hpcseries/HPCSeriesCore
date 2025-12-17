@@ -136,7 +136,7 @@ print(hpcs.simd_info())
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/HPCSeriesCore.git
+git clone https://github.com/hpcseries/HPCSeriesCore.git
 cd HPCSeriesCore
 
 # Build and run Docker container
@@ -179,7 +179,7 @@ pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-gcc-fortran mingw-w64-x86_64-cma
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/HPCSeriesCore.git
+git clone https://github.com/hpcseries/HPCSeriesCore.git
 cd HPCSeriesCore
 
 # Build C/Fortran library
@@ -412,9 +412,16 @@ if not x.flags['C_CONTIGUOUS']:
 ### 3. Set OpenMP Threads
 
 ```bash
-export OMP_NUM_THREADS=8  # Use physical core count
+# Optimal for all architectures (proven via benchmarking)
+export OMP_DYNAMIC=false
+export OMP_PROC_BIND=true
+export OMP_PLACES=cores
+export OMP_NUM_THREADS=2
+
 python your_script.py
 ```
+
+**Why 2 threads?** Empirical testing on AMD EPYC Genoa, Intel Ice Lake, and ARM Graviton3 shows that HPCSeries Core saturates memory bandwidth at 2 threads. Using more threads (4+) degrades performance by 5-18% due to cache contention. See [Performance Methodology](docs/PERFORMANCE.md) for details.
 
 ### 4. Choose Right Function
 
@@ -476,16 +483,18 @@ We welcome contributions! See [Contributing Guide](docs/source/contributing.rst)
 
 ## Support
 
-- ** Documentation**: https://hpcseries.readthedocs.io
-- ** Bug Reports**: [GitHub Issues](https://github.com/your-org/HPCSeriesCore/issues)
-- ** Discussions**: [GitHub Discussions](https://github.com/your-org/HPCSeriesCore/discussions)
-- ** Email**: support@hpcseries.org
+- **📚 Documentation**: [Performance Methodology](docs/PERFORMANCE.md) · [AWS Deployment](docs/AWS_DEPLOYMENT_GUIDE.md)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/hpcseries/HPCSeriesCore/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/hpcseries/HPCSeriesCore/discussions)
+- **📖 Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
 ## License
 
-[Specify your license - MIT, Apache 2.0, etc.]
+HPCSeries Core is released under the **MIT License**. See [LICENSE](LICENSE) for details.
+
+This permissive license allows commercial and academic use, modification, and distribution.
 
 ---
 
@@ -494,14 +503,18 @@ We welcome contributions! See [Contributing Guide](docs/source/contributing.rst)
 If you use HPCSeries Core in your research, please cite:
 
 ```bibtex
-@software{hpcseries_core,
-  title = {HPCSeries Core: High-Performance Statistical Computing Library},
-  author = {HPCSeries Core Team},
+@software{hpcseries_core_2025,
+  title = {HPCSeries Core: High-Performance Statistical Computing for Large-Scale Data Analysis},
+  author = {HPCSeries Core Contributors},
   year = {2025},
+  month = {12},
   version = {0.7.0},
-  url = {https://github.com/your-org/HPCSeriesCore}
+  url = {https://github.com/hpcseries/HPCSeriesCore},
+  license = {MIT}
 }
 ```
+
+Or use GitHub's **"Cite this repository"** button (auto-generated from [CITATION.cff](CITATION.cff)).
 
 ---
 
