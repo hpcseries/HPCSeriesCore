@@ -50,6 +50,7 @@ logs/tests/**/*.log
 
 *.md
 !docs/PERFORMANCE.md
+!docs/PERFORMANCE_SUMMARY.md
 !docs/AWS_DEPLOYMENT_GUIDE.md
 *.pdf
 .claude/
