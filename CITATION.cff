@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If you use HPCSeries Core in your research, please cite it as below."
+type: software
+title: "HPCSeries Core: High-Performance Statistical Computing for Large-Scale Data Analysis"
+version: 0.7.0
+date-released: 2025-12-15
+url: "https://github.com/nrf-samkelo/HPCSeriesCore"
+repository-code: "https://github.com/nrf-samkelo/HPCSeriesCore"
+license: MIT
+authors:
+  - family-names: "HPCSeries Core Contributors"
+    affiliation: "Independent"
+keywords:
+  - high-performance computing
+  - time series analysis
+  - SIMD vectorization
+  - robust statistics
+  - financial analytics
+  - climate modeling
+  - OpenMP
+  - AVX-512
+  - ARM NEON
+abstract: >
+  HPCSeries Core is a CPU-optimized statistical computing library designed for
+  massive datasets (10M+ records). It provides 2-100x faster operations than
+  NumPy/Pandas through SIMD vectorization (AVX2/AVX-512 on x86, NEON on ARM),
+  OpenMP parallelization, and cache-friendly algorithms. The library features
+  architecture-aware compilation that automatically optimizes for Intel Sapphire
+  Rapids, Ice Lake, AMD EPYC Genoa, and ARM Graviton3 processors. Version 0.7.0
+  introduces comprehensive performance validation across cloud platforms, proving
+  memory bandwidth saturation at 2 threads regardless of vCPU count—a hallmark
+  of optimal SIMD implementation.
+preferred-citation:
+  type: software
+  title: "HPCSeries Core: High-Performance Statistical Computing for Large-Scale Data Analysis"
+  version: 0.7.0
+  year: 2025
+  month: 12
+  authors:
+    - family-names: "HPCSeries Core Contributors"
+      affiliation: "Independent"
+  url: "https://github.com/nrf-samkelo/HPCSeriesCore"
+  license: MIT

@@ -2,9 +2,10 @@
 
 **High-Performance Statistical Computing for Large-Scale Data Analysis**
 
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](https://github.com/your-org/HPCSeriesCore)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Architecture](https://img.shields.io/badge/arch-x86%20%7C%20ARM-orange.svg)](docs/PERFORMANCE.md)
 
 ---
 
