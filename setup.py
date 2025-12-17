@@ -1,13 +1,19 @@
 """
-HPCSeries Core v0.7 - Python Bindings Setup
-=============================================
+HPCSeries Core - Python Package Build Configuration
+====================================================
 
-Builds Cython extensions and packages the native libhpcs_core library.
+Builds Cython extensions linking to the native libhpcs_core library.
+
+Prerequisites:
+    - Build libhpcs_core.a first: cmake -S . -B build && cmake --build build
+    - Requires: gcc, gfortran, cmake, numpy, Cython>=3.0
 
 Build commands:
-  python setup.py build_ext --inplace  # Development build
-  pip install -e .                     # Editable install
-  python -m build                      # Build wheel
+    python -m build              # Build wheel (recommended)
+    pip install -e .             # Editable install (development)
+    python setup.py build_ext    # Build extensions only
+
+Configuration is in pyproject.toml (PEP 517/518).
 """
 
 import os
@@ -32,36 +38,61 @@ if IS_LINUX:
     LIB_NAME = "libhpcs_core.a"
 elif IS_MACOS:
     LIB_NAME = "libhpcs_core.a"
+elif IS_WINDOWS:
+    raise RuntimeError(
+        "Windows is not officially supported in v0.7.0.\n"
+        "Consider using WSL2 (Windows Subsystem for Linux) or Docker."
+    )
 else:
-    raise RuntimeError("Windows not yet supported in v0.7")
+    raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
 # Library path
 lib_path = LIB_DIR / LIB_NAME
 if not lib_path.exists():
-    print(f"ERROR: {lib_path} not found!")
-    print("Build the C library first with:")
-    print("  cmake -S . -B build && cmake --build build")
-    print(f"\nSearching for library in: {BUILD_DIR}")
+    error_msg = f"""
+╔══════════════════════════════════════════════════════════════════════════╗
+║ ERROR: Native library not found                                         ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Missing: {lib_path}
+
+The HPCSeries Core Python package requires building the native library first.
+
+Build instructions:
+    mkdir -p build && cd build
+    cmake .. -DCMAKE_BUILD_TYPE=Release
+    cmake --build . -j$(nproc)
+    cd ..
+
+Then retry: pip install -e .
+
+See: https://github.com/hpcseries/HPCSeriesCore#installation
+"""
+    print(error_msg, file=sys.stderr)
+
     if BUILD_DIR.exists():
-        print("Files in build directory:")
         import subprocess
+        print(f"\nFiles found in {BUILD_DIR}:")
         subprocess.run(["ls", "-lh", str(BUILD_DIR)])
+
     raise FileNotFoundError(f"Required library not found: {lib_path}")
 
-# Compiler flags
+# Compiler flags for Cython extensions
+# Note: These flags are used when compiling the Cython-generated C code,
+#       not the native library (which is pre-built via CMake)
 extra_compile_args = [
-    "-O3",
-    "-march=native",
-    "-fopenmp",
-    "-std=c11",
+    "-O3",                # Maximum optimization
+    "-march=native",      # CPU-specific optimizations (matches CMake)
+    "-fopenmp",           # OpenMP support
+    "-std=c11",           # C11 standard
 ]
 
 extra_link_args = [
-    "-fopenmp",
+    "-fopenmp",           # Link OpenMP runtime
 ]
 
 if IS_MACOS:
-    # macOS-specific flags
+    # macOS-specific: Suppress Cython-generated warnings
     extra_compile_args.extend([
         "-Wno-unreachable-code-fallthrough",
         "-Wno-deprecated-declarations",

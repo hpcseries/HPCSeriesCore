@@ -10,31 +10,47 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hpcs"
 version = "0.7.0"
-description = "High-Performance Computing Series - Optimized Statistical Kernels"
+description = "CPU-optimized statistical computing library with SIMD vectorization and OpenMP parallelization for massive datasets (10M+ records)"
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license = {text = "MIT"}
 authors = [
-    {name = "HPCSeries Core Team"}
+    {name = "HPCSeries Core Contributors"}
 ]
-keywords = ["hpc", "statistics", "numpy", "performance", "simd", "openmp"]
+keywords = [
+    "hpc",
+    "high-performance-computing",
+    "statistics",
+    "numpy",
+    "simd",
+    "openmp",
+    "vectorization",
+    "time-series",
+    "rolling-operations",
+    "performance"
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Cython",
     "Programming Language :: C",
     "Programming Language :: Fortran",
     "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Software Development :: Libraries",
-    "Operating System :: POSIX :: Linux",
-    "Operating System :: MacOS",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 dependencies = [
@@ -62,9 +78,13 @@ examples = [
 
 [project.urls]
 Homepage = "https://github.com/hpcseries/HPCSeriesCore"
-Documentation = "https://hpcseries.readthedocs.io"
 Repository = "https://github.com/hpcseries/HPCSeriesCore"
+Documentation = "https://github.com/hpcseries/HPCSeriesCore#documentation"
 Changelog = "https://github.com/hpcseries/HPCSeriesCore/blob/main/CHANGELOG.md"
+Issues = "https://github.com/hpcseries/HPCSeriesCore/issues"
+"Source Code" = "https://github.com/hpcseries/HPCSeriesCore"
+"Performance Docs" = "https://github.com/hpcseries/HPCSeriesCore/blob/main/docs/PERFORMANCE.md"
+"AWS Deployment" = "https://github.com/hpcseries/HPCSeriesCore/blob/main/docs/AWS_DEPLOYMENT_GUIDE.md"
 
 [project.scripts]
 hpcs = "hpcs.cli:main"
