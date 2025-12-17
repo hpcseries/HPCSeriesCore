@@ -289,7 +289,7 @@ SIMD Capabilities:
 
 ## Documentation
 
-### 📚 Main Documentation
+###  Main Documentation
 
 - **[Full Documentation](https://hpcseries.readthedocs.io)** (Sphinx docs)
 - **[API Reference](docs/source/api/index.rst)** - Complete function reference
@@ -316,7 +316,7 @@ Located in [`notebooks/`](notebooks/) directory:
 
 See [Notebooks README](notebooks/README.md) for detailed descriptions.
 
-### 🔧 Technical Documentation
+###  Technical Documentation
 
 - **[Architecture Guide](docs/source/user_guide/architecture.rst)** - System design and internals
 - **[Performance Guide](docs/source/user_guide/performance.rst)** - Optimization and tuning
@@ -324,7 +324,7 @@ See [Notebooks README](notebooks/README.md) for detailed descriptions.
 - **[Calibration Guide](docs/CALIBRATION_GUIDE.md)** - Performance auto-tuning
 - **[NUMA Affinity Guide](docs/NUMA_AFFINITY_GUIDE.md)** - Multi-socket optimization
 
-### 🚀 Deployment
+###  Deployment
 
 - **[AWS Deployment Guide](docs/AWS_DEPLOYMENT_GUIDE.md)** - Production deployment on AWS EC2 (CPU-optimized instances)
 - **[Performance Methodology](docs/PERFORMANCE.md)** - Empirical benchmarks and thread scaling analysis
@@ -483,10 +483,10 @@ We welcome contributions! See [Contributing Guide](docs/source/contributing.rst)
 
 ## Support
 
-- **📚 Documentation**: [Performance Methodology](docs/PERFORMANCE.md) · [AWS Deployment](docs/AWS_DEPLOYMENT_GUIDE.md)
-- **🐛 Bug Reports**: [GitHub Issues](https://github.com/hpcseries/HPCSeriesCore/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/hpcseries/HPCSeriesCore/discussions)
-- **📖 Changelog**: [CHANGELOG.md](CHANGELOG.md)
+- Documentation: [Performance Methodology](docs/PERFORMANCE.md) · [AWS Deployment](docs/AWS_DEPLOYMENT_GUIDE.md)
+- Bug Reports: [GitHub Issues](https://github.com/hpcseries/HPCSeriesCore/issues)
+- Discussions: [GitHub Discussions](https://github.com/hpcseries/HPCSeriesCore/discussions)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
