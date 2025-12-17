@@ -57,7 +57,6 @@ jobs:
 
     - name: Build Python packages
       run: |
-        python -m build --wheel
         python -m build --sdist
 
     - name: Verify packages
