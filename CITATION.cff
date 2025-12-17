@@ -4,8 +4,8 @@ type: software
 title: "HPCSeries Core: High-Performance Statistical Computing for Large-Scale Data Analysis"
 version: 0.7.0
 date-released: 2025-12-15
-url: "https://github.com/nrf-samkelo/HPCSeriesCore"
-repository-code: "https://github.com/nrf-samkelo/HPCSeriesCore"
+url: "https://github.com/hpcseries/HPCSeriesCore"
+repository-code: "https://github.com/hpcseries/HPCSeriesCore"
 license: MIT
 authors:
   - family-names: "HPCSeries Core Contributors"
@@ -39,5 +39,5 @@ preferred-citation:
   authors:
     - family-names: "HPCSeries Core Contributors"
       affiliation: "Independent"
-  url: "https://github.com/nrf-samkelo/HPCSeriesCore"
+  url: "https://github.com/hpcseries/HPCSeriesCore"
   license: MIT

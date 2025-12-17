@@ -73,7 +73,7 @@ export OMP_NUM_THREADS=2
 ### From Source (Recommended)
 
 ```bash
-git clone https://github.com/nrf-samkelo/HPCSeriesCore.git
+git clone https://github.com/hpcseries/HPCSeriesCore.git
 cd HPCSeriesCore
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -140,7 +140,7 @@ If you use HPCSeries Core in your research, please cite:
   author = {HPCSeries Core Contributors},
   year = {2025},
   version = {0.7.0},
-  url = {https://github.com/nrf-samkelo/HPCSeriesCore},
+  url = {https://github.com/hpcseries/HPCSeriesCore},
   license = {MIT}
 }
 ```
