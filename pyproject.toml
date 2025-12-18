@@ -15,7 +15,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "HPCSeries Core Contributors"}
+    {name = "HPCSeries Core Contributors", email = "developer@hpcseries.org"}
 ]
 keywords = [
     "hpc",
@@ -65,9 +65,14 @@ dev = [
     "ruff",
 ]
 docs = [
-    "sphinx>=5.0",
-    "sphinx-rtd-theme",
-    "nbsphinx",
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "nbsphinx>=0.9.0",
+    "sphinx-autodoc-typehints>=1.25.0",
+    "ipython>=8.0.0",
+    "ipykernel>=6.0.0",
+    "jupyter-client>=8.0.0",
+    "sphinx-autoapi>=3.0.0",
 ]
 examples = [
     "jupyter",
@@ -76,14 +81,12 @@ examples = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hpcseries/HPCSeriesCore"
+Homepage = "https://www.hpcseries.org"
 Repository = "https://github.com/hpcseries/HPCSeriesCore"
-Documentation = "https://github.com/hpcseries/HPCSeriesCore#documentation"
+Documentation = "https://hpcseries-core.readthedocs.io/"
 Changelog = "https://github.com/hpcseries/HPCSeriesCore/blob/main/CHANGELOG.md"
 Issues = "https://github.com/hpcseries/HPCSeriesCore/issues"
 "Source Code" = "https://github.com/hpcseries/HPCSeriesCore"
-"Performance Docs" = "https://github.com/hpcseries/HPCSeriesCore/blob/main/docs/PERFORMANCE.md"
-"AWS Deployment" = "https://github.com/hpcseries/HPCSeriesCore/blob/main/docs/AWS_DEPLOYMENT_GUIDE.md"
 
 [project.scripts]
 hpcs = "hpcs.cli:main"

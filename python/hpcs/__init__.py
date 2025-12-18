@@ -29,7 +29,7 @@ Examples
 >>> anomalies = hpcs.detect_anomalies(x, threshold=3.0)
 """
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 __author__ = "HPCSeries Core Team"
 
 # Import core reduction functions from Cython extension

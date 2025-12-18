@@ -1,0 +1,35 @@
+# Read the Docs configuration file for HPCSeries Core
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+version: 2
+
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+  configuration: docs/source/conf.py
+  fail_on_warning: false
+
+# Build documentation with Python 3.12
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.12"
+  jobs:
+    post_checkout:
+      # Mock the native library since we can't build it on RTD
+      - mkdir -p build
+      - touch build/libhpcs_core.a
+
+# Install Python dependencies
+python:
+  install:
+    - requirements: docs/requirements.txt
+    # Install package in editable mode (without building native library)
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+
+# Specify formats for documentation output
+formats:
+  - pdf
+  - epub
