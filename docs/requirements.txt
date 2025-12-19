@@ -1,0 +1,16 @@
+# Documentation build requirements for Read the Docs
+
+# Sphinx theme (Sphinx itself is installed automatically by RTD)
+sphinx-rtd-theme
+
+# Sphinx extensions
+nbsphinx
+sphinx-autodoc-typehints
+
+# Required for nbsphinx
+ipython
+ipykernel
+jupyter-client
+
+# Package dependencies (for API documentation)
+numpy
