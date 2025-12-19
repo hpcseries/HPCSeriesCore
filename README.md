@@ -5,6 +5,7 @@
 [![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Documentation](https://readthedocs.org/projects/hpcseries-core/badge/?version=latest)](https://hpcseriescore.readthedocs.io/)
 [![Architecture](https://img.shields.io/badge/arch-x86%20%7C%20ARM-orange.svg)](docs/PERFORMANCE.md)
 
 ---
@@ -121,6 +122,10 @@ See [Performance Methodology](docs/PERFORMANCE.md) for full analysis.
 
 ## Documentation
 
+### Official Documentation
+
+**📚 [Read the Docs](https://hpcseriescore.readthedocs.io/)** - Complete API reference, user guides, and tutorials
+
 ### Core Documentation
 
 - [Performance Methodology](docs/PERFORMANCE.md) - Empirical benchmarks and thread scaling
@@ -174,6 +179,8 @@ HPCSeriesCore/
 
 ## Support
 
+- **Documentation**: [Read the Docs](https://hpcseriescore.readthedocs.io/)
+- **Contributing**: [Contributing Guide](https://hpcseriescore.readthedocs.io/en/latest/contributing.html)
 - **Bug Reports**: [GitHub Issues](https://github.com/hpcseries/HPCSeriesCore/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/hpcseries/HPCSeriesCore/discussions)
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)

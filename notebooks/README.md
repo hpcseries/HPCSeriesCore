@@ -365,7 +365,7 @@ Have a use case you'd like to see demonstrated? We welcome contributions!
 - Production deployment patterns
 - Edge cases and troubleshooting
 
-See [Contributing Guide](../docs/source/contributing.rst) for more details.
+See [Contributing Guide](https://hpcseriescore.readthedocs.io/en/latest/contributing.html) for more details.
 
 ---
 
@@ -409,8 +409,8 @@ All notebooks include visualization examples:
 ## Support
 
 **Questions about notebooks?**
-- Open an issue: [GitHub Issues](https://github.com/your-org/HPCSeriesCore/issues)
-- Check docs: [Documentation](../docs/source/index.rst)
+- Check the official docs: [HPCSeries Core Documentation](https://hpcseriescore.readthedocs.io/)
+- Open an issue: [GitHub Issues](https://github.com/hpcseries/HPCSeriesCore/issues)
 
 **Found a bug in a notebook?**
 - Please report it with the notebook name and cell number
