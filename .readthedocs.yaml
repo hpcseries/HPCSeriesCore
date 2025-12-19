@@ -24,11 +24,6 @@ sphinx:
 python:
   install:
     - requirements: docs/requirements.txt
-    # Install package in editable mode (without building native library)
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
 
 # Optionally build your docs in additional formats such as PDF and ePub
 formats:
