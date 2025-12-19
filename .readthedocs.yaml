@@ -3,14 +3,9 @@
 
 version: 2
 
-# Build documentation in the docs/ directory with Sphinx
-sphinx:
-  configuration: docs/source/conf.py
-  fail_on_warning: false
-
-# Build documentation with Python 3.12
+# Set the OS, Python version and other tools
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
     python: "3.12"
   jobs:
@@ -19,7 +14,13 @@ build:
       - mkdir -p build
       - touch build/libhpcs_core.a
 
-# Install Python dependencies
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+  configuration: docs/source/conf.py
+  fail_on_warning: false
+
+# Optional but recommended, declare the Python requirements required
+# to build your documentation
 python:
   install:
     - requirements: docs/requirements.txt
@@ -29,7 +30,7 @@ python:
       extra_requirements:
         - docs
 
-# Specify formats for documentation output
+# Optionally build your docs in additional formats such as PDF and ePub
 formats:
   - pdf
   - epub
