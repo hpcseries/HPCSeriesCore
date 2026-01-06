@@ -13,4 +13,10 @@ module hpcs_constants
   integer(c_int), parameter :: HPCS_ERR_INVALID_ARGS = 1_c_int
   integer(c_int), parameter :: HPCS_ERR_NUMERIC_FAIL = 2_c_int
 
+  ! Execution mode constants (v0.8.0 - Safe vs Fast vs Deterministic)
+  integer(c_int), parameter :: HPCS_MODE_SAFE          = 0_c_int
+  integer(c_int), parameter :: HPCS_MODE_FAST          = 1_c_int
+  integer(c_int), parameter :: HPCS_MODE_DETERMINISTIC = 2_c_int
+  integer(c_int), parameter :: HPCS_MODE_USE_GLOBAL    = -1_c_int
+
 end module hpcs_constants

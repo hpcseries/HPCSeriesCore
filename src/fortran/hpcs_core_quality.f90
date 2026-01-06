@@ -54,6 +54,7 @@ contains
   subroutine hpcs_clip(x, n, min_val, max_val, status) &
        bind(C, name="hpcs_clip")
     use iso_c_binding, only: c_int, c_double
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     implicit none
     real(c_double), intent(inout) :: x(*)
     integer(c_int),  value        :: n
@@ -62,6 +63,7 @@ contains
     integer(c_int),  intent(out)  :: status
 
     integer(c_int) :: i, n_eff
+    logical :: is_nan
 
     n_eff = n
     if (n_eff <= 0_c_int .or. min_val > max_val) then
@@ -69,13 +71,16 @@ contains
       return
     end if
 
-    ! Branchless clipping for compiler vectorization
+    ! SIMD-optimized clipping with explicit NaN handling
+    ! Skip NaN values to preserve them (minimal branching)
+    !$omp simd
     do i = 1_c_int, n_eff
-      ! Propagate NaN unchanged
-      if (x(i) /= x(i)) cycle
-      ! Branchless: compiler can vectorize this
-      x(i) = min(max(x(i), min_val), max_val)
+      is_nan = ieee_is_nan(x(i))
+      if (.not. is_nan) then
+        x(i) = min(max(x(i), min_val), max_val)
+      end if
     end do
+    !$omp end simd
     status = HPCS_SUCCESS
   end subroutine hpcs_clip
 

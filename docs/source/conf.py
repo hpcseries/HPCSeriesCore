@@ -5,33 +5,35 @@
 
 import os
 import sys
-from unittest.mock import MagicMock
 
 # Add the Python package to the path so Sphinx can import it
 sys.path.insert(0, os.path.abspath('../../python'))
 
-# Mock Cython extensions for Read the Docs
-# This allows autodoc to work even when native libraries aren't built
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-        return MagicMock()
-
-MOCK_MODULES = [
+# Mock imports for Cython extension modules
+# This prevents import errors on Read the Docs where native libraries can't be built
+autodoc_mock_imports = [
     'hpcs._core',
     'hpcs._simd',
-    'hpcs._reductions',
-    'hpcs._rolling',
-    'hpcs._anomaly',
-    'hpcs._axis',
-    'hpcs._utils',
 ]
 
-# Check if we're running on Read the Docs
+# Check if we're building on Read the Docs
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 
 if on_rtd:
-    sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+    # On RTD, inject documentation stubs for v0.8.0 functions defined in Cython
+    # This allows Sphinx autodoc to extract proper signatures and docstrings
+    # even when the compiled extensions aren't available
+    try:
+        import hpcs._docstubs as _stubs
+        import hpcs
+
+        # Monkey-patch hpcs module with stub functions for documentation
+        for name in dir(_stubs):
+            if not name.startswith('_'):
+                setattr(hpcs, name, getattr(_stubs, name))
+    except ImportError as e:
+        print(f"Warning: Could not import documentation stubs: {e}")
+        pass  # Continue anyway, autodoc_mock_imports will handle it
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -39,8 +41,8 @@ if on_rtd:
 project = 'HPCSeries Core'
 copyright = '2025, HPCSeries Core Team'
 author = 'HPCSeries Core Team'
-version = '0.7.0'
-release = '0.7.0'
+version = '0.8.0'
+release = '0.8.0'
 
 # Project URLs
 html_context = {

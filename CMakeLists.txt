@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(HPCSeriesCore
-    VERSION 0.7.0
+    VERSION 0.8.0
     DESCRIPTION "High-Performance Computing Series Core Library"
     LANGUAGES C CXX Fortran
 )
@@ -107,6 +107,8 @@ endif()
 set(HPCS_CORE_SOURCES
     # v0.1/v0.2 modules (maintained for backward compatibility)
     src/fortran/hpcs_constants.f90
+    # v0.8.0 execution mode control (depends on constants)
+    src/fortran/hpcs_core_execution_mode.f90
     # v0.6 SIMD interface (early in build order)
     src/fortran/hpcs_simd_interface.f90
     src/fortran/hpcs_core_1d.f90
@@ -122,24 +124,29 @@ set(HPCS_CORE_SOURCES
     src/fortran/hpcs_core_stats_parallel.f90
     src/fortran/hpcs_core_quality_parallel.f90
     # v0.3 fast rolling operations (C++ heap-based)
-    src/hpcs_rolling_fast.cpp
+    src/cpp/hpcs_rolling_fast.cpp
     # v0.4 CPU modules (batched, masked, axis, anomaly)
     src/fortran/hpcs_cpu_detect.f90    # Hardware-aware adaptive parallelization
-    src/hpcs_cpu_detect.c              # Enhanced CPU detection (C)
-    src/hpcs_calibrate.c               # v0.5 Benchmark-based auto-tuning
+    src/c/hpcs_cpu_detect.c            # Enhanced CPU detection (C)
+    src/c/hpcs_calibrate.c             # v0.5 Benchmark-based auto-tuning
     # v0.6 SIMD vectorization modules
-    src/hpcs_simd_dispatch.c           # SIMD runtime dispatch
-    src/hpcs_reduce_simd.c             # SIMD reduction kernels (OpenMP)
-    src/hpcs_reduce_intrinsics.c       # SIMD reduction kernels (intrinsics)
-    src/hpcs_rolling_simd.c            # SIMD rolling operations
-    src/hpcs_zscore_simd.c             # SIMD z-score normalization
-    src/hpcs_simd_align.c              # Memory alignment utilities
-    src/hpcs_fortran_simd_bridge.c     # Fortran-SIMD integration bridge
-    src/hpcs_axis_simd.c               # SIMD axis operations (architecture-aware)
+    src/c/hpcs_simd_dispatch.c         # SIMD runtime dispatch
+    src/c/hpcs_reduce_simd.c           # SIMD reduction kernels (OpenMP)
+    src/c/hpcs_reduce_intrinsics.c     # SIMD reduction kernels (intrinsics)
+    src/c/hpcs_rolling_simd.c          # SIMD rolling operations
+    src/c/hpcs_zscore_simd.c           # SIMD z-score normalization
+    src/c/hpcs_simd_align.c            # Memory alignment utilities
+    src/c/hpcs_fortran_simd_bridge.c   # Fortran-SIMD integration bridge
+    src/c/hpcs_axis_simd.c             # SIMD axis operations (architecture-aware)
     src/fortran/hpcs_core_batched.f90
     src/fortran/hpcs_core_masked.f90
     src/fortran/hpcs_core_axis.f90
     src/fortran/hpcs_core_anomaly.f90
+    # v0.8.0 modules (extended transforms & robust statistics)
+    src/fortran/hpcs_core_transforms.f90  # EW stats, diff, cumulative ops
+    src/cpp/hpcs_convolution.cpp          # FIR convolution (mode-aware)
+    src/cpp/hpcs_selection.cpp            # Deterministic selection (introselect)
+    src/cpp/hpcs_robust_stats.cpp         # Trimmed/winsorized mean
 )
 
 # Add CUDA runtime module BEFORE hpcs_core_accel.f90 (dependency order)
@@ -210,8 +217,8 @@ if(BUILD_TESTS)
     # ========================================================================
 
     # Baseline functionality tests (v0.1/v0.2 kernels)
-    # Moved to tests/c/ - use Makefile in tests/c/ to build
-    # add_executable(test_hpcs_baseline tests/c/test_hpcs_baseline.cpp)
+    # Moved to tests/cpp/ - use Makefile in tests/cpp/ to build
+    # add_executable(test_hpcs_baseline tests/cpp/test_hpcs_baseline.cpp)
     # target_link_libraries(test_hpcs_baseline hpcs_core)
     # add_test(NAME test_hpcs_baseline COMMAND test_hpcs_baseline)
 
@@ -266,11 +273,11 @@ endif()
 option(BUILD_BENCHMARKS "Build benchmark suite" ON)
 if(BUILD_BENCHMARKS)
     # v0.1/v0.2 benchmark uses simplified C API wrappers
-    add_executable(bench_core bench/bench_core.cpp src/hpc_series.c)
+    add_executable(bench_core bench/cpp/bench_core.cpp src/c/hpc_series.c)
     target_include_directories(bench_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
     # v0.3 benchmark for robust statistics
-    add_executable(bench_v03 bench/bench_v03.cpp)
+    add_executable(bench_v03 bench/cpp/bench_v03.cpp)
     target_link_libraries(bench_v03 hpcs_core)
     target_include_directories(bench_v03 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
@@ -278,7 +285,7 @@ if(BUILD_BENCHMARKS)
     endif()
 
     # v0.3 optimized benchmark (original vs parallel/fast)
-    add_executable(bench_v03_optimized bench/bench_v03_optimized.cpp)
+    add_executable(bench_v03_optimized bench/cpp/bench_v03_optimized.cpp)
     target_link_libraries(bench_v03_optimized hpcs_core)
     target_include_directories(bench_v03_optimized PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
@@ -286,7 +293,7 @@ if(BUILD_BENCHMARKS)
     endif()
 
     # v0.4 parallel benchmark (batched/axis operations with OpenMP)
-    add_executable(bench_v04_parallel bench/bench_v04_parallel.cpp)
+    add_executable(bench_v04_parallel bench/cpp/bench_v04_parallel.cpp)
     target_link_libraries(bench_v04_parallel hpcs_core OpenMP::OpenMP_CXX)
     target_include_directories(bench_v04_parallel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
@@ -294,7 +301,7 @@ if(BUILD_BENCHMARKS)
     endif()
 
     # Anomaly detection benchmark (classical vs robust vs rolling)
-    add_executable(bench_anomaly_detection bench/bench_anomaly_detection.cpp)
+    add_executable(bench_anomaly_detection bench/cpp/bench_anomaly_detection.cpp)
     target_link_libraries(bench_anomaly_detection hpcs_core)
     target_include_directories(bench_anomaly_detection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
@@ -302,7 +309,7 @@ if(BUILD_BENCHMARKS)
     endif()
 
     # GPU acceleration benchmark (CPU vs GPU comparison)
-    add_executable(bench_gpu_acceleration bench/bench_gpu_acceleration.cpp)
+    add_executable(bench_gpu_acceleration bench/cpp/bench_gpu_acceleration.cpp)
     target_link_libraries(bench_gpu_acceleration hpcs_core)
     target_include_directories(bench_gpu_acceleration PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
@@ -345,7 +352,7 @@ if(BUILD_BENCHMARKS)
     target_include_directories(bench_axis_comparison PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
     # Prefetch optimization benchmark (v0.6 - Microarchitecture Opt)
-    add_executable(bench_prefetch bench/bench_prefetch.c)
+    add_executable(bench_prefetch bench/c/bench_prefetch.c)
     target_link_libraries(bench_prefetch hpcs_core OpenMP::OpenMP_C)
     target_include_directories(bench_prefetch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()

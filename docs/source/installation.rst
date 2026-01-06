@@ -41,7 +41,7 @@ From Source
 
 .. code-block:: bash
 
-   git clone https://github.com/your-org/HPCSeriesCore.git
+   git clone https://github.com/hpcseries/HPCSeriesCore.git
    cd HPCSeriesCore
 
 **2. Install build dependencies:**
@@ -188,5 +188,5 @@ Getting Help
 ------------
 
 - **Documentation**: https://hpcseries.readthedocs.io
-- **GitHub Issues**: https://github.com/your-org/HPCSeriesCore/issues
+- **GitHub Issues**: https://github.com/hpcseries/HPCSeriesCore/issues
 - **Examples**: See the ``notebooks/`` directory

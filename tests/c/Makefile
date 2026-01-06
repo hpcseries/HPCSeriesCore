@@ -4,11 +4,13 @@
 # Compiler settings
 CC = gcc
 CFLAGS = -Wall -O2 -g -I../../include -fopenmp
-LDFLAGS = -L../../build -lhpcs_core -lgfortran -lm -fopenmp
+LDFLAGS = -L../../build -lhpcs_core -lstdc++ -lgfortran -lm -fopenmp
 
 # Test executables
 TESTS = test_hpcs_robust \
         test_fortran_simd \
+        test_transforms_v08 \
+        test_execution_modes \
         test_hpcs_gpu_infra \
         test_hpcs_gpu_kernels \
         test_hpcs_gpu_memory \
@@ -42,11 +44,6 @@ run: all
 	@echo "================================"
 	@echo "C Test Suite Complete"
 	@echo "================================"
-
-# Run a specific test
-test_%: test_%
-	@echo "Running $@..."
-	./$@
 
 # Clean build artifacts
 clean:

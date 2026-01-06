@@ -179,7 +179,7 @@ Expected output:
 ```bash
 # Clone repository
 cd ~
-git clone https://github.com/your-org/HPCSeriesCore.git
+git clone https://github.com/hpcseries/HPCSeriesCore.git
 cd HPCSeriesCore
 
 # Create virtual environment
@@ -331,7 +331,7 @@ exit
 ```bash
 # Clone repository
 cd ~
-git clone https://github.com/your-org/HPCSeriesCore.git
+git clone https://github.com/hpcseries/HPCSeriesCore.git
 cd HPCSeriesCore
 
 # Build container

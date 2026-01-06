@@ -258,7 +258,7 @@ git remote -v
 ### License file
 
 - [ ] `LICENSE` exists
-- [ ] Contains MIT License text
+- [ ] Contains Apache License 2.0 text
 - [ ] Copyright year: 2025
 - [ ] Copyright holder: HPCSeries Core Contributors
 

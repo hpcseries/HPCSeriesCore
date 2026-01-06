@@ -39,6 +39,56 @@ Robust statistical operations using Median Absolute Deviation (MAD).
    hpcs.mad
    hpcs.quantile
 
+Execution Mode API (v0.8)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Control execution mode for safety/performance trade-offs.
+
+.. autosummary::
+   :toctree: generated/
+
+   hpcs.set_execution_mode
+   hpcs.get_execution_mode
+   hpcs.MODE_SAFE
+   hpcs.MODE_FAST
+   hpcs.MODE_DETERMINISTIC
+
+Exponential Weighted Statistics (v0.8)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Streaming statistics with exponential decay weighting (15-60x faster than pandas).
+
+.. autosummary::
+   :toctree: generated/
+
+   hpcs.ewma
+   hpcs.ewvar
+   hpcs.ewstd
+
+Time Series Transforms (v0.8)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Differencing, cumulative operations, and convolution.
+
+.. autosummary::
+   :toctree: generated/
+
+   hpcs.diff
+   hpcs.cumulative_min
+   hpcs.cumulative_max
+   hpcs.convolve_valid
+
+Advanced Robust Statistics (v0.8)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Outlier-resistant descriptive statistics (10-15x faster than SciPy).
+
+.. autosummary::
+   :toctree: generated/
+
+   hpcs.trimmed_mean
+   hpcs.winsorized_mean
+
 Transforms & Normalization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -359,3 +409,91 @@ Load Calibration Config
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autofunction:: hpcs.load_calibration_config
+
+Set Execution Mode
+^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.set_execution_mode
+
+Get Execution Mode
+^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.get_execution_mode
+
+MODE_SAFE
+^^^^^^^^^
+
+Safe execution mode (IEEE 754 compliant, full error checking).
+
+.. data:: hpcs.MODE_SAFE
+   :type: int
+   :value: 0
+
+   Use SAFE mode for maximum numerical stability and error detection.
+
+MODE_FAST
+^^^^^^^^^
+
+Fast execution mode (relaxed math optimizations, minimal validation).
+
+.. data:: hpcs.MODE_FAST
+   :type: int
+   :value: 1
+
+   Use FAST mode for performance-critical code where data is pre-validated.
+
+MODE_DETERMINISTIC
+^^^^^^^^^^^^^^^^^^
+
+Deterministic execution mode (bit-exact reproducibility, no OpenMP).
+
+.. data:: hpcs.MODE_DETERMINISTIC
+   :type: int
+   :value: 2
+
+   Use DETERMINISTIC mode when exact reproducibility is required across runs.
+
+Exponential Weighted Moving Average
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.ewma
+
+Exponential Weighted Variance
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.ewvar
+
+Exponential Weighted Standard Deviation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.ewstd
+
+Differencing
+^^^^^^^^^^^^
+
+.. autofunction:: hpcs.diff
+
+Cumulative Minimum
+^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.cumulative_min
+
+Cumulative Maximum
+^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.cumulative_max
+
+Convolution (Valid Mode)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.convolve_valid
+
+Trimmed Mean
+^^^^^^^^^^^^
+
+.. autofunction:: hpcs.trimmed_mean
+
+Winsorized Mean
+^^^^^^^^^^^^^^^
+
+.. autofunction:: hpcs.winsorized_mean

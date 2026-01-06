@@ -4,7 +4,7 @@
 
 [![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://readthedocs.org/projects/hpcseries-core/badge/?version=latest)](https://hpcseriescore.readthedocs.io/)
 [![Architecture](https://img.shields.io/badge/arch-x86%20%7C%20ARM-orange.svg)](docs/PERFORMANCE.md)
 
@@ -189,7 +189,15 @@ HPCSeriesCore/
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
+Apache License 2.0 - See [LICENSE](LICENSE) for details.
+
+HPCSeries Core is licensed under the Apache License, Version 2.0, which provides:
+- **Patent protection** for both contributors and users
+- **Commercial-friendly** licensing for enterprise adoption
+- **Flexibility** for commercial use, modification, and distribution
+- **Trademark protection** preserving the HPCSeries brand
+
+This license enables both open-source collaboration and commercial applications, including use in proprietary software.
 
 ---
 

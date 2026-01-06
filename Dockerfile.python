@@ -40,6 +40,9 @@ RUN cmake -S . -B build && \
 # Set Python path (before building extensions)
 ENV PYTHONPATH="/workspace/python"
 
+# Clean any existing build artifacts
+RUN rm -rf build/lib.* build/temp.* python/hpcs/*.so python/hpcs/*.c dist/ *.egg-info python/hpcs.egg-info
+
 # Build Python extensions (development mode)
 # Using --no-build-isolation to use system packages, -v for verbose output
 RUN python3 -m pip install -e . --no-build-isolation -v 2>&1 | tee /tmp/build.log || \
@@ -53,6 +56,17 @@ RUN python3 -m pip install -e . --no-build-isolation -v 2>&1 | tee /tmp/build.lo
      echo "Build directory:" && \
      ls -lh build/ | head -20 && \
      exit 1)
+
+# Verify the extension was built
+RUN python3 -c "import hpcs; print(f'HPCSeries version: {hpcs.__version__}')" && \
+    ls -lh python/hpcs/_core*.so
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Default command
 CMD ["/bin/bash"]

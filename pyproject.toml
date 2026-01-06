@@ -9,11 +9,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hpcs"
-version = "0.7.0"
+version = "0.8.0"
 description = "CPU-optimized statistical computing library with SIMD vectorization and OpenMP parallelization for massive datasets (10M+ records)"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 authors = [
     {name = "HPCSeries Core Contributors", email = "developer@hpcseries.org"}
 ]

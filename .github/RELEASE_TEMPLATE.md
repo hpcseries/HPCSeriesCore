@@ -126,7 +126,7 @@ All benchmarks reproducible with included scripts.
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE) for details
+Apache License 2.0 - See [LICENSE](LICENSE) for details
 
 ---
 

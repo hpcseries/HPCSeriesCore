@@ -94,6 +94,32 @@ cdef extern from "hpcs_core.h":
     void hpcs_save_config(const char *path, int *status)
     void hpcs_load_config(const char *path, int *status)
 
+    # v0.8.0 Transform & Robust Statistics
+    # Exponential weighted statistics
+    void hpcs_ewma(const double *x, int n, double alpha, double *y, int mode, int *status)
+    void hpcs_ewvar(const double *x, int n, double alpha, double *v_out, int mode, int *status)
+    void hpcs_ewstd(const double *x, int n, double alpha, double *y, int mode, int *status)
+
+    # Differencing & cumulative transforms
+    void hpcs_diff(const double *x, int n, int order, double *y, int *status)
+    void hpcs_cumulative_min(const double *x, int n, double *y, int mode, int *status)
+    void hpcs_cumulative_max(const double *x, int n, double *y, int mode, int *status)
+
+    # FIR convolution
+    void hpcs_convolve_valid(const double *x, int n, const double *k, int m, double *y, int mode, int *status)
+
+    # Robust descriptive statistics
+    void hpcs_trimmed_mean(const double *x, int n, double trim_frac, double *result, int mode, int *status)
+    void hpcs_winsorized_mean(const double *x, int n, double win_frac, double *result, int mode, int *status)
+
+    # Execution mode API (v0.8.0)
+    int HPCS_MODE_SAFE
+    int HPCS_MODE_FAST
+    int HPCS_MODE_DETERMINISTIC
+    int HPCS_MODE_USE_GLOBAL
+    void hpcs_set_execution_mode(int mode, int *status)
+    void hpcs_get_execution_mode(int *mode, int *status)
+
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
@@ -126,6 +152,105 @@ cdef inline void check_status(int status, str func_name):
 hpcs_simd_reductions_init()
 hpcs_rolling_simd_init()
 hpcs_zscore_simd_init()
+
+# ==============================================================================
+# Execution Mode API (v0.8.0)
+# ==============================================================================
+
+# Python-friendly mode names
+MODE_SAFE = 'safe'
+MODE_FAST = 'fast'
+MODE_DETERMINISTIC = 'deterministic'
+
+def set_execution_mode(mode):
+    """
+    Set the global execution mode for HPCS operations.
+
+    Parameters
+    ----------
+    mode : str
+        Execution mode: 'safe', 'fast', or 'deterministic'
+        - 'safe': Full NaN detection and validation (default)
+        - 'fast': Skip checks for maximum performance (1.2-2x faster)
+        - 'deterministic': Full validation, disable SIMD/threading for reproducibility
+
+    Raises
+    ------
+    ValueError
+        If mode is not one of: 'safe', 'fast', 'deterministic'
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> hpcs.set_execution_mode('fast')  # Skip NaN checks globally
+    >>> result = hpcs.ewma(data, alpha=0.5)  # Uses FAST mode
+    """
+    cdef int c_mode
+    cdef int status
+
+    # Parse mode string to C constant
+    if mode == 'safe':
+        c_mode = HPCS_MODE_SAFE
+    elif mode == 'fast':
+        c_mode = HPCS_MODE_FAST
+    elif mode == 'deterministic':
+        c_mode = HPCS_MODE_DETERMINISTIC
+    else:
+        raise ValueError(f"Invalid mode '{mode}'. Must be 'safe', 'fast', or 'deterministic'")
+
+    # Call C API
+    hpcs_set_execution_mode(c_mode, &status)
+    check_status(status, "set_execution_mode")
+
+def get_execution_mode():
+    """
+    Get the current global execution mode.
+
+    Returns
+    -------
+    str
+        Current mode: 'safe', 'fast', or 'deterministic'
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> hpcs.get_execution_mode()
+    'safe'
+    >>> hpcs.set_execution_mode('fast')
+    >>> hpcs.get_execution_mode()
+    'fast'
+    """
+    cdef int c_mode
+    cdef int status
+
+    hpcs_get_execution_mode(&c_mode, &status)
+    check_status(status, "get_execution_mode")
+
+    # Convert C constant to string
+    if c_mode == HPCS_MODE_SAFE:
+        return 'safe'
+    elif c_mode == HPCS_MODE_FAST:
+        return 'fast'
+    elif c_mode == HPCS_MODE_DETERMINISTIC:
+        return 'deterministic'
+    else:
+        return f'unknown({c_mode})'
+
+cdef inline int _parse_mode(object mode) except -999:
+    """
+    Internal helper to parse mode parameter (None or string) to C constant.
+    Returns HPCS_MODE_USE_GLOBAL if mode is None.
+    """
+    if mode is None:
+        return HPCS_MODE_USE_GLOBAL
+    elif mode == 'safe':
+        return HPCS_MODE_SAFE
+    elif mode == 'fast':
+        return HPCS_MODE_FAST
+    elif mode == 'deterministic':
+        return HPCS_MODE_DETERMINISTIC
+    else:
+        raise ValueError(f"Invalid mode '{mode}'. Must be None, 'safe', 'fast', or 'deterministic'")
 
 # ==============================================================================
 # Python API - Reductions
@@ -1222,3 +1347,339 @@ def load_calibration_config(path):
 
     hpcs_load_config(path_bytes, &status)
     check_status(status, "load_calibration_config")
+
+# ==============================================================================
+# v0.8.0 API - Transform & Robust Statistics
+# ==============================================================================
+
+def ewma(x, alpha, mode=None):
+    """
+    Exponentially weighted moving average.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    alpha : float
+        Smoothing factor ∈ (0, 1]. Higher alpha = more weight on recent values.
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+        - 'safe': Full NaN detection (default)
+        - 'fast': Skip NaN checks for ~1.5x speedup
+        - 'deterministic': Disable SIMD for reproducibility
+
+    Returns
+    -------
+    result : ndarray
+        EWMA of input array
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> import numpy as np
+    >>> x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    >>> hpcs.ewma(x, alpha=0.5)
+    array([1. , 1.5, 2.25, 3.125, 4.0625])
+
+    >>> # Use FAST mode for maximum performance (skip NaN checks)
+    >>> hpcs.ewma(x, alpha=0.5, mode='fast')
+    array([1. , 1.5, 2.25, 3.125, 4.0625])
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_ewma(&arr[0], n, alpha, &result[0], c_mode, &status)
+    check_status(status, "ewma")
+    return result
+
+def ewvar(x, alpha, mode=None):
+    """
+    Exponentially weighted variance.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    alpha : float
+        Smoothing factor ∈ (0, 1]
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        EW variance of input array
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [1.0, 2.0, 3.0, 4.0, 5.0]
+    >>> hpcs.ewvar(x, alpha=0.3)
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_ewvar(&arr[0], n, alpha, &result[0], c_mode, &status)
+    check_status(status, "ewvar")
+    return result
+
+def ewstd(x, alpha, mode=None):
+    """
+    Exponentially weighted standard deviation.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    alpha : float
+        Smoothing factor ∈ (0, 1]
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        EW standard deviation of input array
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [1.0, 2.0, 3.0, 4.0, 5.0]
+    >>> hpcs.ewstd(x, alpha=0.4)
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_ewstd(&arr[0], n, alpha, &result[0], c_mode, &status)
+    check_status(status, "ewstd")
+    return result
+
+def diff(x, order=1):
+    """
+    Finite differencing (discrete derivative).
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    order : int, optional
+        Lag order (default: 1 for first difference)
+
+    Returns
+    -------
+    result : ndarray
+        Differenced array. First `order` elements are NaN.
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [1.0, 3.0, 6.0, 10.0, 15.0]
+    >>> hpcs.diff(x, order=1)  # First differences
+    array([nan,  2.,  3.,  4.,  5.])
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
+    cdef int status
+
+    hpcs_diff(&arr[0], n, order, &result[0], &status)
+    check_status(status, "diff")
+    return result
+
+def cumulative_min(x, mode=None):
+    """
+    Cumulative minimum (running minimum).
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Cumulative minimum at each position
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [5.0, 3.0, 4.0, 1.0, 2.0]
+    >>> hpcs.cumulative_min(x)
+    array([5., 3., 3., 1., 1.])
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_cumulative_min(&arr[0], n, &result[0], c_mode, &status)
+    check_status(status, "cumulative_min")
+    return result
+
+def cumulative_max(x, mode=None):
+    """
+    Cumulative maximum (running maximum).
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Cumulative maximum at each position
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [1.0, 5.0, 3.0, 7.0, 2.0]
+    >>> hpcs.cumulative_max(x)
+    array([1., 5., 5., 7., 7.])
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_cumulative_max(&arr[0], n, &result[0], c_mode, &status)
+    check_status(status, "cumulative_max")
+    return result
+
+def convolve_valid(x, kernel, mode=None):
+    """
+    1D convolution (valid mode, no padding).
+    Optimized for small kernels (size 3-15).
+
+    Parameters
+    ----------
+    x : array_like
+        Input signal
+    kernel : array_like
+        Filter kernel (weights)
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+        - 'deterministic': Disables OpenMP parallelization for reproducibility
+
+    Returns
+    -------
+    result : ndarray
+        Convolved signal (length = len(x) - len(kernel) + 1)
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [1.0, 2.0, 3.0, 4.0, 5.0]
+    >>> kernel = [0.25, 0.5, 0.25]  # Smoothing kernel
+    >>> hpcs.convolve_valid(x, kernel)
+    array([2., 3., 4.])
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] k = ensure_c_contiguous(kernel)
+    cdef int n = arr.shape[0]
+    cdef int m = k.shape[0]
+    cdef int out_n = n - m + 1
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(out_n, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_convolve_valid(&arr[0], n, &k[0], m, &result[0], c_mode, &status)
+    check_status(status, "convolve_valid")
+    return result
+
+def trimmed_mean(x, trim_frac, mode=None):
+    """
+    Trimmed mean (discard extremes before averaging).
+    Uses deterministic O(n) selection.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    trim_frac : float
+        Fraction to trim from each tail ∈ [0, 0.5)
+        E.g., 0.1 = remove bottom 10% and top 10%
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : float
+        Trimmed mean
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [1.0, 2.0, 3.0, 4.0, 100.0]  # outlier
+    >>> hpcs.trimmed_mean(x, trim_frac=0.2)  # Remove 1 from each end
+    3.0
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef double result
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_trimmed_mean(&arr[0], n, trim_frac, &result, c_mode, &status)
+    check_status(status, "trimmed_mean")
+    return result
+
+def winsorized_mean(x, win_frac, mode=None):
+    """
+    Winsorized mean (clamp extremes before averaging).
+    Uses deterministic O(n) selection.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    win_frac : float
+        Fraction to winsorize from each tail ∈ [0, 0.5)
+        E.g., 0.1 = clamp bottom 10% and top 10%
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : float
+        Winsorized mean
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> x = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 100.0]
+    >>> hpcs.winsorized_mean(x, win_frac=0.1)  # Clamp 1 value each end
+    5.5
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef int n = arr.shape[0]
+    cdef double result
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_winsorized_mean(&arr[0], n, win_frac, &result, c_mode, &status)
+    check_status(status, "winsorized_mean")
+    return result

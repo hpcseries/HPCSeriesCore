@@ -381,6 +381,26 @@ void hpcs_detect_anomalies(
 );
 
 /* --------------------------------------------------------------------- */
+/* Prefix Operations (hpcs_core_prefix) - v0.2                          */
+/* --------------------------------------------------------------------- */
+
+/* Inclusive prefix sum: y[i] = sum(x[0:i+1]) */
+void hpcs_prefix_sum(
+    const double *x,
+    int           n,
+    double       *y,
+    int          *status
+);
+
+/* Exclusive prefix sum: y[0] = 0, y[i] = sum(x[0:i]) for i > 0 */
+void hpcs_prefix_sum_exclusive(
+    const double *x,
+    int           n,
+    double       *y,
+    int          *status
+);
+
+/* --------------------------------------------------------------------- */
 /* Parallel Kernels (hpcs_core_parallel) - v0.2                         */
 /* --------------------------------------------------------------------- */
 
@@ -693,6 +713,170 @@ void hpcs_rolling_mad_fast(
 );
 
 /* ============================================================================
+ * v0.8.0: EXTENDED TRANSFORMS & DESCRIPTIVE STATISTICS
+ * ============================================================================
+ * New kernels for time-series analytics and robust statistics:
+ *   - Exponential weighted statistics (EWMA, EWVAR, EWSTD)
+ *   - Differencing and cumulative transforms
+ *   - FIR convolution filters
+ *   - Robust descriptive statistics (trimmed mean, winsorized mean)
+ *
+ * All kernels use NaN propagation (status=2 for all-NaN inputs).
+ * ========================================================================== */
+
+/* ----------------------------------------------------------------------------
+ * G. Exponential Moving Statistics (v0.8.0)
+ * -------------------------------------------------------------------------- */
+
+/* Exponential Weighted Moving Average (EWMA)
+ * Formula: y[0] = x[0]; y[t] = alpha * x[t] + (1-alpha) * y[t-1]
+ * Parameters:
+ *   alpha - smoothing factor ∈ (0, 1]  (0.2 = slow, 0.8 = fast)
+ *   mode  - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args, 2=all NaN */
+void hpcs_ewma(
+    const double *x,
+    int           n,
+    double        alpha,
+    double       *y,
+    int           mode,
+    int          *status
+);
+
+/* Exponential Weighted Variance (EWVAR)
+ * Numerically stable Welford-style recurrence for EW variance.
+ * Parameters:
+ *   mode  - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args, 2=all NaN */
+void hpcs_ewvar(
+    const double *x,
+    int           n,
+    double        alpha,
+    double       *v_out,
+    int           mode,
+    int          *status
+);
+
+/* Exponential Weighted Standard Deviation (EWSTD)
+ * Square root of exponentially weighted variance.
+ * Parameters:
+ *   mode  - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args, 2=all NaN */
+void hpcs_ewstd(
+    const double *x,
+    int           n,
+    double        alpha,
+    double       *y,
+    int           mode,
+    int          *status
+);
+
+/* ----------------------------------------------------------------------------
+ * H. Differencing & Cumulative Transforms (v0.8.0)
+ * -------------------------------------------------------------------------- */
+
+/* Finite Differencing
+ * Compute lag-k difference: y[t] = x[t] - x[t-k]
+ * First k elements are set to NaN.
+ * Parameters:
+ *   order - lag order (k ≥ 1), typically 1 for first difference
+ * Status: 0=success, 1=invalid args */
+void hpcs_diff(
+    const double *x,
+    int           n,
+    int           order,
+    double       *y,
+    int          *status
+);
+
+/* Cumulative Minimum (running minimum)
+ * y[t] = min(y[t-1], x[t])  (prefix minimum operation)
+ * Parameters:
+ *   mode  - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args, 2=all NaN */
+void hpcs_cumulative_min(
+    const double *x,
+    int           n,
+    double       *y,
+    int           mode,
+    int          *status
+);
+
+/* Cumulative Maximum (running maximum)
+ * y[t] = max(y[t-1], x[t])  (prefix maximum operation)
+ * Parameters:
+ *   mode  - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args, 2=all NaN */
+void hpcs_cumulative_max(
+    const double *x,
+    int           n,
+    double       *y,
+    int           mode,
+    int          *status
+);
+
+/* ----------------------------------------------------------------------------
+ * I. Finite Impulse Response Filters (v0.8.0)
+ * -------------------------------------------------------------------------- */
+
+/* Valid-mode 1D Convolution
+ * Computes y[i] = Σ x[i+j] * k[j] for valid region only (no padding).
+ * Optimized for small kernels (m = 3-15) with template specializations.
+ * Output length = n - m + 1.
+ * Parameters:
+ *   k    - filter kernel weights [m]
+ *   m    - kernel length (should be ≪ n)
+ *   mode - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args */
+void hpcs_convolve_valid(
+    const double *x,
+    int           n,
+    const double *k,
+    int           m,
+    double       *y,
+    int           mode,
+    int          *status
+);
+
+/* ----------------------------------------------------------------------------
+ * J. Robust Descriptive Statistics (v0.8.0)
+ * -------------------------------------------------------------------------- */
+
+/* Trimmed Mean
+ * Mean after discarding fraction `trim_frac` of smallest and largest values.
+ * Uses deterministic O(n) selection (introselect).
+ * Parameters:
+ *   trim_frac - fraction to trim from each tail ∈ [0, 0.5)
+ *               (0.1 = 10% trim, 0.2 = 20% trim)
+ *   mode      - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args, 2=all NaN or no elements remain */
+void hpcs_trimmed_mean(
+    const double *x,
+    int           n,
+    double        trim_frac,
+    double       *result,
+    int           mode,
+    int          *status
+);
+
+/* Winsorized Mean
+ * Mean after clamping extreme values to quantile bounds.
+ * Uses deterministic O(n) selection (introselect).
+ * Parameters:
+ *   win_frac - fraction to winsorize from each tail ∈ [0, 0.5)
+ *              (0.1 = clamp bottom 10% and top 10%)
+ *   mode     - execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+ * Status: 0=success, 1=invalid args, 2=all NaN */
+void hpcs_winsorized_mean(
+    const double *x,
+    int           n,
+    double        win_frac,
+    double       *result,
+    int           mode,
+    int          *status
+);
+
+/* ============================================================================
  * v0.4 GPU ACCELERATION CONTROL (Phase 1)
  * ============================================================================
  * GPU acceleration infrastructure for transparent hardware acceleration.
@@ -787,6 +971,79 @@ void hpcs_set_device(
  *   status    - 0=success */
 void hpcs_get_device(
     int *device_id,
+    int *status
+);
+
+/* ============================================================================
+ * v0.8.0: EXECUTION MODE CONTROL (Safe vs Fast vs Deterministic)
+ * ============================================================================
+ * Runtime control for NaN checking, validation, and SIMD behavior.
+ *
+ * Three execution modes provide performance vs safety trade-offs:
+ *
+ * SAFE (0) - Default production mode:
+ *   - Full NaN detection and validation
+ *   - IEEE 754 compliant
+ *   - SIMD/vectorization allowed
+ *   - Returns status=2 for all-NaN inputs
+ *
+ * FAST (1) - Maximum performance mode:
+ *   - Skip all NaN checks and validation
+ *   - Assume inputs are valid and finite
+ *   - 1.2-2x faster than SAFE
+ *   - Use only with validated data pipelines
+ *
+ * DETERMINISTIC (2) - Scientific reproducibility mode:
+ *   - Full NaN checks like SAFE
+ *   - Disable SIMD/vectorization (force scalar)
+ *   - Strict reduction order (no parallelism)
+ *   - Bit-exact reproducibility across runs/architectures
+ *   - 1.6-4x slower than SAFE
+ *
+ * API Pattern:
+ *   - Global mode: Set once, applies to all subsequent calls
+ *   - Per-call override: Pass mode explicitly (overrides global)
+ *   - Thread-safe: Uses OpenMP threadprivate storage
+ *
+ * Example:
+ *   hpcs_set_execution_mode(HPCS_MODE_FAST, &status);
+ *   hpcs_ewma(x, n, alpha, y, HPCS_MODE_USE_GLOBAL, &status);  // uses FAST
+ *   hpcs_ewma(x, n, alpha, y, HPCS_MODE_SAFE, &status);        // override to SAFE
+ * ========================================================================== */
+
+/* Execution mode constants */
+#define HPCS_MODE_SAFE           0  /* Full NaN checks, validation (default) */
+#define HPCS_MODE_FAST           1  /* Skip checks, assume valid inputs */
+#define HPCS_MODE_DETERMINISTIC  2  /* Full checks, disable SIMD, reproducible */
+#define HPCS_MODE_USE_GLOBAL    -1  /* Use current global mode setting */
+
+/* Set global execution mode
+ *
+ * Sets the default mode for all subsequent function calls that use
+ * HPCS_MODE_USE_GLOBAL (-1) as their mode parameter.
+ *
+ * Parameters:
+ *   mode   - Execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC)
+ *   status - 0=success, 1=invalid mode
+ *
+ * Thread Safety: Thread-local via OpenMP threadprivate
+ * Default: HPCS_MODE_SAFE (0)
+ */
+void hpcs_set_execution_mode(
+    int  mode,
+    int *status
+);
+
+/* Get current global execution mode
+ *
+ * Query the current thread's execution mode setting.
+ *
+ * Parameters:
+ *   mode   - Output: current mode (0, 1, or 2)
+ *   status - 0=success
+ */
+void hpcs_get_execution_mode(
+    int *mode,
     int *status
 );
 

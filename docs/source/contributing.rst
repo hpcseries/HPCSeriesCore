@@ -10,7 +10,7 @@ Development Setup
 
    .. code-block:: bash
 
-      git clone https://github.com/your-org/HPCSeriesCore.git
+      git clone https://github.com/hpcseries/HPCSeriesCore.git
       cd HPCSeriesCore
 
 2. **Install development dependencies**:
@@ -144,5 +144,5 @@ Good First Issues
 Contact
 -------
 
-- **GitHub Issues**: https://github.com/your-org/HPCSeriesCore/issues
-- **Discussions**: https://github.com/your-org/HPCSeriesCore/discussions
+- **GitHub Issues**: https://github.com/hpcseries/HPCSeriesCore/issues
+- **Discussions**: https://github.com/hpcseries/HPCSeriesCore/discussions

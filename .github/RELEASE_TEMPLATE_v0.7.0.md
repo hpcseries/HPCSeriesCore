@@ -229,7 +229,7 @@ export OMP_NUM_THREADS=2  # Universal recommendation
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE) for details
+Apache License 2.0 - See [LICENSE](LICENSE) for details
 
 ---
 

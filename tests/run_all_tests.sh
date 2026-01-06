@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 # Test results
 PYTHON_PASSED=0
 C_PASSED=0
+CPP_PASSED=0
 FORTRAN_PASSED=0
 TOTAL_FAILED=0
 
@@ -78,10 +79,29 @@ cd ..
 echo ""
 
 #=============================================
+# C++ Tests
+#=============================================
+echo "----------------------------------------"
+echo "3. Running C++ Tests"
+echo "----------------------------------------"
+
+cd cpp
+if make run 2>&1; then
+    CPP_PASSED=1
+    echo -e "${GREEN}✓ C++ tests PASSED${NC}"
+else
+    echo -e "${RED}✗ C++ tests FAILED${NC}"
+    TOTAL_FAILED=$((TOTAL_FAILED + 1))
+fi
+cd ..
+
+echo ""
+
+#=============================================
 # Fortran Tests
 #=============================================
 echo "----------------------------------------"
-echo "3. Running Fortran Tests"
+echo "4. Running Fortran Tests"
 echo "----------------------------------------"
 
 if command -v gfortran &> /dev/null; then
@@ -108,13 +128,14 @@ echo "========================================"
 echo "Test Suite Summary"
 echo "========================================"
 
-TOTAL_PASSED=$((PYTHON_PASSED + C_PASSED + FORTRAN_PASSED))
+TOTAL_PASSED=$((PYTHON_PASSED + C_PASSED + CPP_PASSED + FORTRAN_PASSED))
 
 echo "Python:   $( [ $PYTHON_PASSED -eq 1 ] && echo -e '${GREEN}✓ PASSED${NC}' || echo -e '${RED}✗ FAILED${NC}' )"
 echo "C:        $( [ $C_PASSED -eq 1 ] && echo -e '${GREEN}✓ PASSED${NC}' || echo -e '${RED}✗ FAILED${NC}' )"
+echo "C++:      $( [ $CPP_PASSED -eq 1 ] && echo -e '${GREEN}✓ PASSED${NC}' || echo -e '${RED}✗ FAILED${NC}' )"
 echo "Fortran:  $( [ $FORTRAN_PASSED -eq 1 ] && echo -e '${GREEN}✓ PASSED${NC}' || echo -e '${RED}✗ FAILED${NC}' )"
 echo ""
-echo "Total: $TOTAL_PASSED/3 test suites passed"
+echo "Total: $TOTAL_PASSED/4 test suites passed"
 
 if [ $TOTAL_FAILED -eq 0 ]; then
     echo -e "${GREEN}========================================"

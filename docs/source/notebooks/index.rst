@@ -13,7 +13,7 @@ To run these notebooks locally:
 .. code-block:: bash
 
    # Clone the repository
-   git clone https://github.com/your-org/HPCSeriesCore.git
+   git clone https://github.com/hpcseries/HPCSeriesCore.git
    cd HPCSeriesCore
 
    # Install HPCSeries with examples dependencies
@@ -41,7 +41,7 @@ All notebooks showcase **real or realistic datasets** and demonstrate practical 
 00. Getting Started
 ~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `00_getting_started.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/00_getting_started.ipynb>`_
+**Notebook**: `00_getting_started.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/00_getting_started.ipynb>`_
 
 **Quick introduction to HPCSeries Core**
 
@@ -59,7 +59,7 @@ Learn:
 01. Rolling Mean vs Rolling Median
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `01_rolling_mean_vs_median.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/01_rolling_mean_vs_median.ipynb>`_
+**Notebook**: `01_rolling_mean_vs_median.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/01_rolling_mean_vs_median.ipynb>`_
 
 **Dataset**: Daily temperature readings from a weather station (1 year)
 
@@ -75,7 +75,7 @@ Learn:
 02. Robust Anomaly Detection (Climate Data)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `02_robust_anomaly_climate.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/02_robust_anomaly_climate.ipynb>`_
+**Notebook**: `02_robust_anomaly_climate.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/02_robust_anomaly_climate.ipynb>`_
 
 **Dataset**: Historical climate data with extreme weather events
 
@@ -91,7 +91,7 @@ Learn:
 03. Batched IoT Rolling Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `03_batched_iot_rolling.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/03_batched_iot_rolling.ipynb>`_
+**Notebook**: `03_batched_iot_rolling.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/03_batched_iot_rolling.ipynb>`_
 
 **Dataset**: Multiple IoT sensor streams with data gaps
 
@@ -107,7 +107,7 @@ Learn:
 04. Axis Reductions (Column Statistics)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `04_axis_reductions_column_stats.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/04_axis_reductions_column_stats.ipynb>`_
+**Notebook**: `04_axis_reductions_column_stats.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/04_axis_reductions_column_stats.ipynb>`_
 
 **Dataset**: Multi-feature sensor array (1000 samples × 10 sensors)
 
@@ -123,7 +123,7 @@ Learn:
 05. Masked Operations (Missing Data)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `05_masked_missing_data.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/05_masked_missing_data.ipynb>`_
+**Notebook**: `05_masked_missing_data.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/05_masked_missing_data.ipynb>`_
 
 **Dataset**: Sensor data with missing values (NaN gaps)
 
@@ -139,7 +139,7 @@ Learn:
 06. Performance Calibration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `06_performance_calibration.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/06_performance_calibration.ipynb>`_
+**Notebook**: `06_performance_calibration.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/06_performance_calibration.ipynb>`_
 
 **Auto-tuning HPCSeries for your hardware**
 
@@ -156,7 +156,7 @@ Learn:
 07. C-Optimized Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `07_c_optimized_operations.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/07_c_optimized_operations.ipynb>`_
+**Notebook**: `07_c_optimized_operations.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/07_c_optimized_operations.ipynb>`_
 
 **Deep dive into SIMD acceleration**
 
@@ -173,7 +173,7 @@ Learn:
 08. NumPy/Pandas Migration Guide
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `08_numpy_pandas_migration_guide.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/08_numpy_pandas_migration_guide.ipynb>`_
+**Notebook**: `08_numpy_pandas_migration_guide.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/08_numpy_pandas_migration_guide.ipynb>`_
 
 **Step-by-step migration examples**
 
@@ -188,7 +188,7 @@ Learn:
 09. Real-World Applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Notebook**: `09_real_world_applications.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/09_real_world_applications.ipynb>`_
+**Notebook**: `09_real_world_applications.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/09_real_world_applications.ipynb>`_
 
 **Complete examples across multiple domains**
 
@@ -206,8 +206,8 @@ Kaggle Competition: Store Sales Forecasting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Notebooks**:
-  - `HPCSeries_Kaggle_StoreSales_v1.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/HPCSeries_Kaggle_StoreSales_v1.ipynb>`_ - Baseline approach
-  - `HPCSeries_Kaggle_StoreSales_v2.ipynb <https://github.com/your-org/HPCSeriesCore/blob/main/notebooks/HPCSeries_Kaggle_StoreSales_v2.ipynb>`_ - Optimized with HPCSeries
+  - `HPCSeries_Kaggle_StoreSales_v1.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/HPCSeries_Kaggle_StoreSales_v1.ipynb>`_ - Baseline approach
+  - `HPCSeries_Kaggle_StoreSales_v2.ipynb <https://github.com/hpcseries/HPCSeriesCore/blob/main/notebooks/HPCSeries_Kaggle_StoreSales_v2.ipynb>`_ - Optimized with HPCSeries
 
 **Competition**: Kaggle Store Sales - Time Series Forecasting
 
@@ -258,7 +258,7 @@ We welcome notebook contributions! See :doc:`../contributing` for guidelines.
 Support
 -------
 
-- **Questions?** Open an issue on `GitHub <https://github.com/your-org/HPCSeriesCore/issues>`_
+- **Questions?** Open an issue on `GitHub <https://github.com/hpcseries/HPCSeriesCore/issues>`_
 - **Want to share your notebook?** Submit a pull request!
 - **Found a bug in a notebook?** Please report it
 
@@ -269,7 +269,7 @@ All notebooks are included in the repository:
 
 .. code-block:: bash
 
-   git clone https://github.com/your-org/HPCSeriesCore.git
+   git clone https://github.com/hpcseries/HPCSeriesCore.git
    cd HPCSeriesCore/notebooks
 
 Or download as ZIP from GitHub.

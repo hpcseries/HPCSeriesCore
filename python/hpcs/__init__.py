@@ -1,5 +1,5 @@
 """
-HPCSeries Core v0.7 - Python Bindings
+HPCSeries Core v0.8 - Python Bindings
 ======================================
 
 High-performance statistical computing library with SIMD vectorization,
@@ -29,7 +29,7 @@ Examples
 >>> anomalies = hpcs.detect_anomalies(x, threshold=3.0)
 """
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 __author__ = "HPCSeries Core Team"
 
 # Import core reduction functions from Cython extension
@@ -52,6 +52,24 @@ from hpcs._core import (
     robust_zscore,
     normalize_minmax,
     clip,
+
+    # Extended transforms & descriptive statistics (v0.8.0)
+    ewma,
+    ewvar,
+    ewstd,
+    diff,
+    cumulative_min,
+    cumulative_max,
+    convolve_valid,
+    trimmed_mean,
+    winsorized_mean,
+
+    # Execution mode API (v0.8.0)
+    set_execution_mode,
+    get_execution_mode,
+    MODE_SAFE,
+    MODE_FAST,
+    MODE_DETERMINISTIC,
 
     # Anomaly detection
     detect_anomalies,
@@ -128,6 +146,24 @@ __all__ = [
     "robust_zscore",
     "normalize_minmax",
     "clip",
+
+    # Extended transforms & descriptive statistics (v0.8.0)
+    "ewma",
+    "ewvar",
+    "ewstd",
+    "diff",
+    "cumulative_min",
+    "cumulative_max",
+    "convolve_valid",
+    "trimmed_mean",
+    "winsorized_mean",
+
+    # Execution mode API (v0.8.0)
+    "set_execution_mode",
+    "get_execution_mode",
+    "MODE_SAFE",
+    "MODE_FAST",
+    "MODE_DETERMINISTIC",
 
     # Anomaly detection
     "detect_anomalies",

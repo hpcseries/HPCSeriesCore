@@ -422,7 +422,7 @@ All notebooks include visualization examples:
 
 ## License
 
-All notebooks and sample data are provided under the MIT License.
+All notebooks and sample data are provided under the Apache License 2.0.
 
 See `../LICENSE` for details.
 
