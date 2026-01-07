@@ -33,12 +33,18 @@ cdef extern from "hpcs_core.h":
     int HPCS_SUCCESS
     int HPCS_ERR_INVALID_ARGS
 
-    # Reduction functions (Fortran interface)
-    void hpcs_reduce_sum(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_mean(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_variance(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_min(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_max(const double *x, int n, double *out, int *status)
+    # Reduction functions (Fortran interface with v0.8.0 execution mode support)
+    void hpcs_reduce_sum(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_mean(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_variance(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_std(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_min(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_max(const double *x, int n, double *out, int mode, int *status)
+
+    # Grouped reductions (v0.8.0 with execution mode support)
+    void hpcs_group_reduce_sum(const double *x, int n, const int *group_ids, int n_groups, double *y, int mode, int *status)
+    void hpcs_group_reduce_mean(const double *x, int n, const int *group_ids, int n_groups, double *y, int mode, int *status)
+    void hpcs_group_reduce_variance(const double *x, int n, const int *group_ids, int n_groups, double *y, int mode, int *status)
 
     # SIMD-accelerated reductions (v0.6)
     void hpcs_reduce_sum_simd(const double *x, int n, double *out, int *status)
@@ -256,14 +262,17 @@ cdef inline int _parse_mode(object mode) except -999:
 # Python API - Reductions
 # ==============================================================================
 
-def sum(x):
+def sum(x, mode=None):
     """
-    Sum of array elements (SIMD-accelerated).
+    Sum of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -275,25 +284,31 @@ def sum(x):
     >>> import hpcs
     >>> hpcs.sum([1, 2, 3, 4, 5])
     15.0
+    >>> hpcs.sum([1, 2, 3, 4, 5], mode='fast')
+    15.0
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_sum_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_sum(&arr[0], n, &result, c_mode, &status)
     check_status(status, "sum")
 
     return result
 
-def mean(x):
+def mean(x, mode=None):
     """
-    Mean of array elements (SIMD-accelerated).
+    Mean of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -310,80 +325,92 @@ def mean(x):
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_mean_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_mean(&arr[0], n, &result, c_mode, &status)
     check_status(status, "mean")
 
     return result
 
-def var(x):
+def var(x, mode=None):
     """
-    Variance of array elements (SIMD-accelerated).
+    Variance of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
     result : float
-        Sample variance
+        Population variance
 
     Examples
     --------
     >>> import hpcs
     >>> hpcs.var([1, 2, 3, 4, 5])
-    2.5
+    2.0
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_variance_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_variance(&arr[0], n, &result, c_mode, &status)
     check_status(status, "var")
 
     return result
 
-def std(x):
+def std(x, mode=None):
     """
-    Standard deviation of array elements (SIMD-accelerated).
+    Standard deviation of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
     result : float
-        Sample standard deviation
+        Population standard deviation
 
     Examples
     --------
     >>> import hpcs
     >>> hpcs.std([1, 2, 3, 4, 5])
-    1.5811388300841898
+    1.4142135623730951
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_std_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_std(&arr[0], n, &result, c_mode, &status)
     check_status(status, "std")
 
     return result
 
-def min(x):
+def min(x, mode=None):
     """
-    Minimum of array elements (SIMD-accelerated).
+    Minimum of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -394,20 +421,24 @@ def min(x):
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_min_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_min(&arr[0], n, &result, c_mode, &status)
     check_status(status, "min")
 
     return result
 
-def max(x):
+def max(x, mode=None):
     """
-    Maximum of array elements (SIMD-accelerated).
+    Maximum of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -418,10 +449,107 @@ def max(x):
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_max_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_max(&arr[0], n, &result, c_mode, &status)
     check_status(status, "max")
 
+    return result
+
+def group_sum(x, group_ids, n_groups, mode=None):
+    """
+    Grouped sum (v0.8.0 with execution mode support).
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    group_ids : array_like (int)
+        Group IDs (0-indexed, values in [0, n_groups-1])
+    n_groups : int
+        Number of groups
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Sum for each group (length n_groups)
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] gids = np.ascontiguousarray(group_ids, dtype=np.int32)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n_groups, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_group_reduce_sum(&arr[0], n, <int*>&gids[0], n_groups, &result[0], c_mode, &status)
+    check_status(status, "group_sum")
+    return result
+
+def group_mean(x, group_ids, n_groups, mode=None):
+    """
+    Grouped mean (v0.8.0 with execution mode support).
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    group_ids : array_like (int)
+        Group IDs (0-indexed, values in [0, n_groups-1])
+    n_groups : int
+        Number of groups
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Mean for each group (length n_groups). Empty groups return NaN.
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] gids = np.ascontiguousarray(group_ids, dtype=np.int32)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n_groups, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_group_reduce_mean(&arr[0], n, <int*>&gids[0], n_groups, &result[0], c_mode, &status)
+    check_status(status, "group_mean")
+    return result
+
+def group_var(x, group_ids, n_groups, mode=None):
+    """
+    Grouped variance (v0.8.0 with execution mode support).
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    group_ids : array_like (int)
+        Group IDs (0-indexed, values in [0, n_groups-1])
+    n_groups : int
+        Number of groups
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Population variance for each group (length n_groups). Empty groups return NaN.
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] gids = np.ascontiguousarray(group_ids, dtype=np.int32)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n_groups, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_group_reduce_variance(&arr[0], n, <int*>&gids[0], n_groups, &result[0], c_mode, &status)
+    check_status(status, "group_var")
     return result
 
 # ==============================================================================

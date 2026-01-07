@@ -122,7 +122,7 @@ contains
     end if
 
     if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_reduce_sum(x, n, out, status)
+       call hpcs_reduce_sum(x, n, out, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -168,7 +168,7 @@ contains
     end if
 
     if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_reduce_min(x, n, out, status)
+       call hpcs_reduce_min(x, n, out, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -214,7 +214,7 @@ contains
     end if
 
     if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_reduce_max(x, n, out, status)
+       call hpcs_reduce_max(x, n, out, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -270,7 +270,7 @@ contains
     end if
 
     if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_group_reduce_sum(x, n, group_ids, n_groups, y, status)
+       call hpcs_group_reduce_sum(x, n, group_ids, n_groups, y, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -355,7 +355,7 @@ contains
     end if
 
     if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_group_reduce_mean(x, n, group_ids, n_groups, y, status)
+       call hpcs_group_reduce_mean(x, n, group_ids, n_groups, y, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -512,7 +512,7 @@ contains
 
     ! Fall back to serial for small arrays
     if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_reduce_mean(x, n, out, status)
+       call hpcs_reduce_mean(x, n, out, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -560,7 +560,7 @@ contains
 
     ! Fall back to serial for small arrays
     if (n_eff < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_reduce_variance(x, n, out, status)
+       call hpcs_reduce_variance(x, n, out, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -605,7 +605,7 @@ contains
 
     ! Fall back to serial for small arrays
     if (n < HPCS_PARALLEL_THRESHOLD) then
-       call hpcs_reduce_std(x, n, out, status)
+       call hpcs_reduce_std(x, n, out, HPCS_MODE_USE_GLOBAL, status)
        return
     end if
 
@@ -660,7 +660,7 @@ contains
     !
     ! See: BENCHMARK_RESULTS_SUMMARY.md for detailed analysis
 
-    call hpcs_group_reduce_variance(x, n, group_ids, n_groups, y, status)
+    call hpcs_group_reduce_variance(x, n, group_ids, n_groups, y, HPCS_MODE_USE_GLOBAL, status)
   end subroutine hpcs_group_reduce_variance_parallel
 
 end module hpcs_core_parallel

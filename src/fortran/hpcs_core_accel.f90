@@ -1094,7 +1094,7 @@ contains
     ! -----------------------------------------------------------------------
     ! CPU Fallback (when GPU not available or policy=CPU_ONLY)
     ! -----------------------------------------------------------------------
-    call hpcs_reduce_sum(data_array, n, result, status)
+    call hpcs_reduce_sum(data_array, n, result, HPCS_MODE_USE_GLOBAL, status)
 #endif
 
   end subroutine hpcs_accel_reduce_sum

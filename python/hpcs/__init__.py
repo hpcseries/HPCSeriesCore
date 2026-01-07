@@ -42,6 +42,11 @@ from hpcs._core import (
     min,
     max,
 
+    # Grouped reductions (v0.8.0 Phase 1)
+    group_sum,
+    group_mean,
+    group_var,
+
     # Robust statistics
     median,
     mad,
@@ -135,6 +140,11 @@ __all__ = [
     "std",
     "min",
     "max",
+
+    # Grouped reductions (v0.8.0 Phase 1)
+    "group_sum",
+    "group_mean",
+    "group_var",
 
     # Robust stats
     "median",

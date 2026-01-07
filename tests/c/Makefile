@@ -11,6 +11,7 @@ TESTS = test_hpcs_robust \
         test_fortran_simd \
         test_transforms_v08 \
         test_execution_modes \
+        test_reductions_modes \
         test_hpcs_gpu_infra \
         test_hpcs_gpu_kernels \
         test_hpcs_gpu_memory \

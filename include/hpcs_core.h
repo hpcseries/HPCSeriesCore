@@ -74,6 +74,7 @@ void hpcs_reduce_sum(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -82,6 +83,7 @@ void hpcs_reduce_min(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -90,6 +92,7 @@ void hpcs_reduce_max(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -98,6 +101,7 @@ void hpcs_reduce_mean(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -106,6 +110,7 @@ void hpcs_reduce_variance(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -114,6 +119,7 @@ void hpcs_reduce_std(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -124,6 +130,7 @@ void hpcs_group_reduce_sum(
     const int    *group_ids,
     int           n_groups,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -134,6 +141,7 @@ void hpcs_group_reduce_mean(
     const int    *group_ids,
     int           n_groups,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -144,6 +152,7 @@ void hpcs_group_reduce_variance(
     const int    *group_ids,
     int           n_groups,
     double       *y,
+    int           mode,
     int          *status
 );
 
