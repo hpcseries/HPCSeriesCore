@@ -15,7 +15,9 @@
 
 module hpcs_core_1d
   use iso_c_binding,  only: c_int, c_double
+  use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
   use hpcs_constants
+  use hpcs_core_execution_mode, only: hpcs_get_execution_mode_internal
   implicit none
   public
 
@@ -37,7 +39,19 @@ contains
   !   HPCS_SUCCESS          : success
   !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0
   !--------------------------------------------------------------------
-  subroutine hpcs_rolling_sum(x, n, window, y, status) &
+  !--------------------------------------------------------------------
+  ! Rolling sum (v0.8.0 - with execution mode support)
+  !
+  ! y(i) = sum of elements in window ending at position i
+  !
+  ! Parameters:
+  !   mode: Execution mode (SAFE/FAST/DETERMINISTIC/USE_GLOBAL)
+  !
+  ! Status:
+  !   HPCS_SUCCESS          : success
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0 or invalid mode
+  !--------------------------------------------------------------------
+  subroutine hpcs_rolling_sum(x, n, window, y, mode, status) &
        bind(C, name="hpcs_rolling_sum")
     use iso_c_binding, only: c_int, c_double
     implicit none
@@ -46,10 +60,44 @@ contains
     integer(c_int),  value      :: n
     integer(c_int),  value      :: window
     real(c_double), intent(out) :: y(*)      ! length n
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: i
-    integer(c_int) :: n_eff, w_eff
+    integer(c_int) :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_rolling_sum_safe(x, n, window, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_rolling_sum_fast(x, n, window, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_rolling_sum_deterministic(x, n, window, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_rolling_sum
+
+  ! SAFE mode: Full validation with NaN checking
+  subroutine hpcs_rolling_sum_safe(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, j, n_eff, w_eff, k, valid_count
     real(c_double) :: sum
 
     n_eff = n
@@ -60,31 +108,98 @@ contains
        return
     end if
 
+    ! Process each position
+    do i = 1_c_int, n_eff
+       sum = 0.0_c_double
+       valid_count = 0_c_int
+
+       ! Determine window bounds
+       if (i < w_eff) then
+          k = i
+       else
+          k = w_eff
+       end if
+
+       ! Sum valid (non-NaN) elements in window
+       do j = i - k + 1_c_int, i
+          if (x(j) == x(j)) then  ! NaN check
+             sum = sum + x(j)
+             valid_count = valid_count + 1_c_int
+          end if
+       end do
+
+       ! Return sum or NaN if all values were NaN
+       if (valid_count > 0_c_int) then
+          y(i) = sum
+       else
+          y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+       end if
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_sum_safe
+
+  ! FAST mode: No validation, maximum speed with sliding window
+  subroutine hpcs_rolling_sum_fast(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, n_eff, w_eff
+    real(c_double) :: sum
+
+    n_eff = n
+    w_eff = window
+
     sum = 0.0_c_double
 
+    ! Sliding window optimization: add new element, subtract old
     do i = 1_c_int, n_eff
-       sum = sum + x(i)    ! add new element
+       sum = sum + x(i)    ! Add new element
 
        if (i > w_eff) then
-          sum = sum - x(i - w_eff)  ! subtract element leaving the window
+          sum = sum - x(i - w_eff)  ! Subtract element leaving window
        end if
 
        y(i) = sum
     end do
 
     status = HPCS_SUCCESS
-  end subroutine hpcs_rolling_sum
+  end subroutine hpcs_rolling_sum_fast
+
+  ! DETERMINISTIC mode: Same as SAFE (no OpenMP in original)
+  subroutine hpcs_rolling_sum_deterministic(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    ! Delegate to SAFE mode
+    call hpcs_rolling_sum_safe(x, n, window, y, status)
+  end subroutine hpcs_rolling_sum_deterministic
 
   !--------------------------------------------------------------------
-  ! Rolling mean
+  ! Rolling mean (v0.8.0 - with execution mode support)
   !
   ! y(i) = rolling_sum(i) / min(i, window)
   !
+  ! Parameters:
+  !   mode: Execution mode (SAFE/FAST/DETERMINISTIC/USE_GLOBAL)
+  !
   ! Status:
   !   HPCS_SUCCESS          : success
-  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0 or invalid mode
   !--------------------------------------------------------------------
-  subroutine hpcs_rolling_mean(x, n, window, y, status) &
+  subroutine hpcs_rolling_mean(x, n, window, y, mode, status) &
        bind(C, name="hpcs_rolling_mean")
     use iso_c_binding, only: c_int, c_double
     implicit none
@@ -93,10 +208,43 @@ contains
     integer(c_int),  value      :: n
     integer(c_int),  value      :: window
     real(c_double), intent(out) :: y(*)       ! length n
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: i
-    integer(c_int) :: n_eff, w_eff, k
+    integer(c_int) :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_rolling_mean_safe(x, n, window, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_rolling_mean_fast(x, n, window, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_rolling_mean_deterministic(x, n, window, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_rolling_mean
+
+  ! SAFE mode: Full validation with NaN checking
+  subroutine hpcs_rolling_mean_safe(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, j, n_eff, w_eff, k, valid_count
     real(c_double) :: sum
 
     n_eff = n
@@ -106,6 +254,54 @@ contains
        status = HPCS_ERR_INVALID_ARGS
        return
     end if
+
+    ! Process each position
+    do i = 1_c_int, n_eff
+       sum = 0.0_c_double
+       valid_count = 0_c_int
+
+       ! Determine window bounds
+       if (i < w_eff) then
+          k = i
+       else
+          k = w_eff
+       end if
+
+       ! Sum valid (non-NaN) elements in window
+       do j = i - k + 1_c_int, i
+          if (x(j) == x(j)) then  ! NaN check
+             sum = sum + x(j)
+             valid_count = valid_count + 1_c_int
+          end if
+       end do
+
+       ! Compute mean or NaN if all values were NaN
+       if (valid_count > 0_c_int) then
+          y(i) = sum / real(valid_count, kind=c_double)
+       else
+          y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+       end if
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_mean_safe
+
+  ! FAST mode: No validation, maximum speed
+  subroutine hpcs_rolling_mean_fast(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, n_eff, w_eff, k
+    real(c_double) :: sum
+
+    n_eff = n
+    w_eff = window
 
     sum = 0.0_c_double
 
@@ -125,32 +321,84 @@ contains
     end do
 
     status = HPCS_SUCCESS
-  end subroutine hpcs_rolling_mean
+  end subroutine hpcs_rolling_mean_fast
+
+  ! DETERMINISTIC mode: Same as SAFE (no OpenMP in original)
+  subroutine hpcs_rolling_mean_deterministic(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    ! Same as SAFE mode since no parallelization
+    call hpcs_rolling_mean_safe(x, n, window, y, status)
+  end subroutine hpcs_rolling_mean_deterministic
 
   !--------------------------------------------------------------------
-  ! Rolling variance (v0.2)
+  ! Rolling variance (v0.8.0 - with execution mode support)
   !
   ! Computes rolling window population variance using the formula:
   !   variance = E[X²] - (E[X])²
   !
   ! Maintains rolling sum and rolling sum-of-squares for O(n) complexity.
   !
+  ! Parameters:
+  !   mode: Execution mode (SAFE/FAST/DETERMINISTIC/USE_GLOBAL)
+  !
   ! Status:
   !   HPCS_SUCCESS          : success
-  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0 or invalid mode
   !--------------------------------------------------------------------
-  subroutine hpcs_rolling_variance(x, n, window, y, status) &
+  subroutine hpcs_rolling_variance(x, n, window, y, mode, status) &
        bind(C, name="hpcs_rolling_variance")
     use iso_c_binding, only: c_int, c_double
     implicit none
 
-    real(c_double), intent(in)  :: x(*)       ! length n
+    real(c_double), intent(in)  :: x(*)
     integer(c_int),  value      :: n
     integer(c_int),  value      :: window
-    real(c_double), intent(out) :: y(*)       ! length n
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: i, n_eff, w_eff, k
+    integer(c_int) :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_rolling_variance_safe(x, n, window, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_rolling_variance_fast(x, n, window, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_rolling_variance_deterministic(x, n, window, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_rolling_variance
+
+  ! SAFE mode: Full validation with NaN checking
+  subroutine hpcs_rolling_variance_safe(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, j, n_eff, w_eff, k, valid_count
     real(c_double) :: sum, sum_sq, mean, mean_sq, var
 
     n_eff = n
@@ -160,6 +408,60 @@ contains
        status = HPCS_ERR_INVALID_ARGS
        return
     end if
+
+    ! Process each position
+    do i = 1_c_int, n_eff
+       sum = 0.0_c_double
+       sum_sq = 0.0_c_double
+       valid_count = 0_c_int
+
+       ! Determine window bounds
+       if (i < w_eff) then
+          k = i
+       else
+          k = w_eff
+       end if
+
+       ! Sum valid (non-NaN) elements in window
+       do j = i - k + 1_c_int, i
+          if (x(j) == x(j)) then  ! NaN check
+             sum = sum + x(j)
+             sum_sq = sum_sq + x(j) * x(j)
+             valid_count = valid_count + 1_c_int
+          end if
+       end do
+
+       ! Compute variance or NaN if all values were NaN
+       if (valid_count > 0_c_int) then
+          mean = sum / real(valid_count, kind=c_double)
+          mean_sq = sum_sq / real(valid_count, kind=c_double)
+          var = mean_sq - mean * mean
+          if (var < 0.0_c_double) var = 0.0_c_double
+          y(i) = var
+       else
+          y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+       end if
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_variance_safe
+
+  ! FAST mode: No validation, maximum speed
+  subroutine hpcs_rolling_variance_fast(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, n_eff, w_eff, k
+    real(c_double) :: sum, sum_sq, mean, mean_sq, var
+
+    n_eff = n
+    w_eff = window
 
     sum    = 0.0_c_double
     sum_sq = 0.0_c_double
@@ -194,34 +496,86 @@ contains
     end do
 
     status = HPCS_SUCCESS
-  end subroutine hpcs_rolling_variance
+  end subroutine hpcs_rolling_variance_fast
+
+  ! DETERMINISTIC mode: Same as SAFE (no OpenMP in original)
+  subroutine hpcs_rolling_variance_deterministic(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    ! Same as SAFE mode since no parallelization
+    call hpcs_rolling_variance_safe(x, n, window, y, status)
+  end subroutine hpcs_rolling_variance_deterministic
 
   !--------------------------------------------------------------------
-  ! Rolling standard deviation (v0.2)
+  ! Rolling standard deviation (v0.8.0 - with execution mode support)
   !
   ! Computes rolling window standard deviation as sqrt(rolling_variance)
   !
+  ! Parameters:
+  !   mode: Execution mode (SAFE/FAST/DETERMINISTIC/USE_GLOBAL)
+  !
   ! Status:
   !   HPCS_SUCCESS          : success
-  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0
+  !   HPCS_ERR_INVALID_ARGS : n <= 0 or window <= 0 or invalid mode
   !--------------------------------------------------------------------
-  subroutine hpcs_rolling_std(x, n, window, y, status) &
+  subroutine hpcs_rolling_std(x, n, window, y, mode, status) &
        bind(C, name="hpcs_rolling_std")
     use iso_c_binding, only: c_int, c_double
     implicit none
 
-    real(c_double), intent(in)  :: x(*)       ! length n
+    real(c_double), intent(in)  :: x(*)
     integer(c_int),  value      :: n
     integer(c_int),  value      :: window
-    real(c_double), intent(out) :: y(*)       ! length n
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_rolling_std_safe(x, n, window, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_rolling_std_fast(x, n, window, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_rolling_std_deterministic(x, n, window, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_rolling_std
+
+  ! SAFE mode: Call rolling_variance_safe + sqrt
+  subroutine hpcs_rolling_std_safe(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
     integer(c_int),  intent(out):: status
 
     integer(c_int) :: i, n_eff
 
     n_eff = n
 
-    ! Compute rolling variance first
-    call hpcs_rolling_variance(x, n, window, y, status)
+    ! Compute rolling variance first (SAFE mode)
+    call hpcs_rolling_variance_safe(x, n, window, y, status)
     if (status /= HPCS_SUCCESS) then
        return
     end if
@@ -232,7 +586,51 @@ contains
     end do
 
     status = HPCS_SUCCESS
-  end subroutine hpcs_rolling_std
+  end subroutine hpcs_rolling_std_safe
+
+  ! FAST mode: Call rolling_variance_fast + sqrt
+  subroutine hpcs_rolling_std_fast(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, n_eff
+
+    n_eff = n
+
+    ! Compute rolling variance first (FAST mode)
+    call hpcs_rolling_variance_fast(x, n, window, y, status)
+    if (status /= HPCS_SUCCESS) then
+       return
+    end if
+
+    ! Take square root of each variance value
+    do i = 1_c_int, n_eff
+       y(i) = sqrt(y(i))
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_std_fast
+
+  ! DETERMINISTIC mode: Same as SAFE (no OpenMP in original)
+  subroutine hpcs_rolling_std_deterministic(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    ! Same as SAFE mode since no parallelization
+    call hpcs_rolling_std_safe(x, n, window, y, status)
+  end subroutine hpcs_rolling_std_deterministic
 
   !--------------------------------------------------------------------
   ! Z-score transform

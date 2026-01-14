@@ -125,7 +125,7 @@ Key difference:
 
 - **Full Methodology:** [docs/PERFORMANCE.md](PERFORMANCE.md)
 - **AWS Deployment:** [docs/AWS_DEPLOYMENT_GUIDE.md](AWS_DEPLOYMENT_GUIDE.md)
-- **Source Code:** [GitHub](https://github.com/nrf-samkelo/HPCSeriesCore)
+- **Source Code:** [GitHub](https://github.com/hpcseries/HPCSeriesCore)
 
 ---
 

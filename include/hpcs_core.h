@@ -1,6 +1,17 @@
 #ifndef HPCS_CORE_H
 #define HPCS_CORE_H
 
+/* --------------------------------------------------------------------- */
+/* Version information                                                   */
+/* --------------------------------------------------------------------- */
+#define HPCS_VERSION_MAJOR 0
+#define HPCS_VERSION_MINOR 8
+#define HPCS_VERSION_PATCH 0
+#define HPCS_VERSION_STRING "0.8.0"
+
+/* ABI version (increment on breaking changes) */
+#define HPCS_ABI_VERSION 1
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -21,12 +32,13 @@ enum {
 /* 1D Kernels (hpcs_core_1d)                                             */
 /* --------------------------------------------------------------------- */
 
-/* rolling sum: y[i] = sum of last window values up to i */
+/* rolling sum: y[i] = sum of last window values up to i (v0.8.0 with execution mode support) */
 void hpcs_rolling_sum(
     const double *x,
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -36,24 +48,27 @@ void hpcs_rolling_mean(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
-/* rolling variance: population variance over rolling window (v0.2) */
+/* rolling variance: population variance over rolling window (v0.8.0 with execution mode support) */
 void hpcs_rolling_variance(
     const double *x,
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
-/* rolling std: standard deviation over rolling window (v0.2) */
+/* rolling std: standard deviation over rolling window (v0.8.0 with execution mode support) */
 void hpcs_rolling_std(
     const double *x,
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -212,21 +227,23 @@ void hpcs_reduce_max_simd(
 /* Axis Reductions (v0.4 - 2D array operations)                         */
 /* --------------------------------------------------------------------- */
 
-/* Sum along axis 1 (per-row sum) - x is (n×m) Fortran-order */
+/* Sum along axis 1 (per-row sum) - x is (n×m) Fortran-order (v0.8.0 with execution mode support) */
 void hpcs_reduce_sum_axis1(
     const double *x,
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
-/* Mean along axis 1 (per-row mean) */
+/* Mean along axis 1 (per-row mean) (v0.8.0 with execution mode support) */
 void hpcs_reduce_mean_axis1(
     const double *x,
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -236,6 +253,7 @@ void hpcs_median_axis1(
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -245,6 +263,7 @@ void hpcs_mad_axis1(
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -270,30 +289,33 @@ void hpcs_reduce_max_axis0_simd(
 /* Masked Reductions (v0.4 - operations on masked arrays)               */
 /* --------------------------------------------------------------------- */
 
-/* Sum of masked array (mask[i]=1 means valid, 0 means skip) */
+/* Sum of masked array (mask[i]=1 means valid, 0 means skip) (v0.8.0 with execution mode support) */
 void hpcs_reduce_sum_masked(
     const double *x,
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
-/* Mean of masked array */
+/* Mean of masked array (v0.8.0 with execution mode support) */
 void hpcs_reduce_mean_masked(
     const double *x,
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
-/* Variance of masked array */
+/* Variance of masked array (v0.8.0 with execution mode support) */
 void hpcs_reduce_variance_masked(
     const double *x,
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -303,6 +325,7 @@ void hpcs_median_masked(
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -312,6 +335,7 @@ void hpcs_mad_masked(
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -491,6 +515,7 @@ void hpcs_median(
     const double *x,
     int           n,
     double       *median,
+    int           mode,
     int          *status
 );
 
@@ -499,6 +524,7 @@ void hpcs_mad(
     const double *x,
     int           n,
     double       *mad,
+    int           mode,
     int          *status
 );
 
@@ -508,6 +534,7 @@ void hpcs_quantile(
     int           n,
     double        q,
     double       *value,
+    int           mode,
     int          *status
 );
 
@@ -521,6 +548,7 @@ void hpcs_rolling_median(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -530,6 +558,7 @@ void hpcs_rolling_mad(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -539,6 +568,7 @@ void hpcs_rolling_zscore(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -548,6 +578,7 @@ void hpcs_rolling_robust_zscore(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -1372,6 +1403,40 @@ void hpcs_save_config(const char *path, int *status);
  *   status - 0=success, 1=error (e.g., file not found)
  */
 void hpcs_load_config(const char *path, int *status);
+
+/* --------------------------------------------------------------------- */
+/* Version Query Functions (v0.8.0)                                      */
+/* --------------------------------------------------------------------- */
+
+/* Get library version string
+ *
+ * Returns semantic version string (e.g., "0.8.0")
+ * Used by downstream consumers to verify runtime compatibility.
+ *
+ * Returns:
+ *   Version string (statically allocated, do not free)
+ *
+ * Example:
+ *   const char* version = hpcs_get_version();
+ *   printf("HPCSeries Core version: %s\n", version);
+ */
+const char* hpcs_get_version(void);
+
+/* Get ABI version number
+ *
+ * Returns ABI compatibility version (incremented on breaking changes).
+ * Same major version = ABI compatible.
+ *
+ * Returns:
+ *   ABI version number (currently 1)
+ *
+ * Example:
+ *   int abi = hpcs_get_abi_version();
+ *   if (abi != EXPECTED_ABI) {
+ *       fprintf(stderr, "ABI mismatch!\n");
+ *   }
+ */
+int hpcs_get_abi_version(void);
 
 #ifdef __cplusplus
 }

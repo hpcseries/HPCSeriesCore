@@ -19,6 +19,7 @@ module hpcs_core_masked
   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
   use hpcs_constants
   use hpcs_core_stats, only: hpcs_median, hpcs_mad
+  use hpcs_core_execution_mode, only: hpcs_get_execution_mode_internal
   implicit none
   private
   public :: hpcs_reduce_sum_masked
@@ -41,8 +42,45 @@ contains
   ! all entries), the output is NaN and status=HPCS_ERR_NUMERIC_FAIL.
   ! Invalid arguments (n<0) produce status=HPCS_ERR_INVALID_ARGS.
   !--------------------------------------------------------------------------
-  subroutine hpcs_reduce_sum_masked(x, mask, n, out, status) &
+  ! hpcs_reduce_sum_masked (v0.8.0 dispatcher with execution mode support)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_sum_masked(x, mask, n, out, mode, status) &
        bind(C, name="hpcs_reduce_sum_masked")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: effective_mode
+
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_reduce_sum_masked_safe(x, mask, n, out, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_reduce_sum_masked_fast(x, mask, n, out, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_reduce_sum_masked_deterministic(x, mask, n, out, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_reduce_sum_masked
+
+  !--------------------------------------------------------------------------
+  ! SAFE mode: Full NaN detection and validation
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_sum_masked_safe(x, mask, n, out, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -51,10 +89,8 @@ contains
     real(c_double), intent(out) :: out
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: n_eff
-    integer(c_int) :: i
+    integer(c_int) :: n_eff, i, count
     real(c_double) :: acc
-    integer(c_int) :: count
     logical        :: has_nan
 
     n_eff = n
@@ -73,7 +109,7 @@ contains
     has_nan = .false.
     do i = 1_c_int, n_eff
       if (mask(i) /= 0_c_int) then
-        if (x(i) /= x(i)) then
+        if (x(i) /= x(i)) then  ! NaN check
           has_nan = .true.
         else
           acc = acc + x(i)
@@ -81,6 +117,7 @@ contains
         end if
       end if
     end do
+
     if (count == 0_c_int) then
       out = ieee_value(0.0_c_double, ieee_quiet_nan)
       status = HPCS_ERR_NUMERIC_FAIL
@@ -91,18 +128,12 @@ contains
       out = acc
       status = HPCS_SUCCESS
     end if
-  end subroutine hpcs_reduce_sum_masked
+  end subroutine hpcs_reduce_sum_masked_safe
 
   !--------------------------------------------------------------------------
-  ! hpcs_reduce_mean_masked
-  !
-  ! Compute the mean of valid elements in x as indicated by mask.  If
-  ! count==0 (no valid elements) the result is NaN and status=2.  NaN
-  ! propagation: any NaN among valid entries propagates to the result and
-  ! yields status=2.  Invalid arguments (n<0) yield status=1.
+  ! FAST mode: No validation, maximum speed
   !--------------------------------------------------------------------------
-  subroutine hpcs_reduce_mean_masked(x, mask, n, out, status) &
-       bind(C, name="hpcs_reduce_mean_masked")
+  subroutine hpcs_reduce_sum_masked_fast(x, mask, n, out, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -111,10 +142,96 @@ contains
     real(c_double), intent(out) :: out
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: n_eff
-    integer(c_int) :: i
+    integer(c_int) :: i, count
     real(c_double) :: acc
-    integer(c_int) :: count
+
+    ! No input validation - assume valid
+    acc = 0.0_c_double
+    count = 0_c_int
+
+    ! No NaN checks - direct accumulation
+    do i = 1_c_int, n
+      if (mask(i) /= 0_c_int) then
+        acc = acc + x(i)
+        count = count + 1_c_int
+      end if
+    end do
+
+    if (count > 0_c_int) then
+      out = acc
+      status = HPCS_SUCCESS
+    else
+      out = ieee_value(0.0_c_double, ieee_quiet_nan)
+      status = HPCS_ERR_NUMERIC_FAIL
+    end if
+  end subroutine hpcs_reduce_sum_masked_fast
+
+  !--------------------------------------------------------------------------
+  ! DETERMINISTIC mode: Full validation, no SIMD (delegates to SAFE)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_sum_masked_deterministic(x, mask, n, out, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  intent(out):: status
+
+    ! Already sequential, same as SAFE mode
+    call hpcs_reduce_sum_masked_safe(x, mask, n, out, status)
+  end subroutine hpcs_reduce_sum_masked_deterministic
+
+  !--------------------------------------------------------------------------
+  ! hpcs_reduce_mean_masked (v0.8.0 dispatcher with execution mode support)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_mean_masked(x, mask, n, out, mode, status) &
+       bind(C, name="hpcs_reduce_mean_masked")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: effective_mode
+
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_reduce_mean_masked_safe(x, mask, n, out, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_reduce_mean_masked_fast(x, mask, n, out, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_reduce_mean_masked_deterministic(x, mask, n, out, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_reduce_mean_masked
+
+  !--------------------------------------------------------------------------
+  ! SAFE mode: Full NaN detection and validation
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_mean_masked_safe(x, mask, n, out, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: n_eff, i, count
+    real(c_double) :: acc
     logical        :: has_nan
 
     n_eff = n
@@ -133,7 +250,7 @@ contains
     has_nan = .false.
     do i = 1_c_int, n_eff
       if (mask(i) /= 0_c_int) then
-        if (x(i) /= x(i)) then
+        if (x(i) /= x(i)) then  ! NaN check
           has_nan = .true.
         else
           acc = acc + x(i)
@@ -141,6 +258,7 @@ contains
         end if
       end if
     end do
+
     if (count == 0_c_int .or. has_nan) then
       out = ieee_value(0.0_c_double, ieee_quiet_nan)
       status = HPCS_ERR_NUMERIC_FAIL
@@ -148,19 +266,12 @@ contains
       out = acc / real(count, kind=c_double)
       status = HPCS_SUCCESS
     end if
-  end subroutine hpcs_reduce_mean_masked
+  end subroutine hpcs_reduce_mean_masked_safe
 
   !--------------------------------------------------------------------------
-  ! hpcs_reduce_variance_masked
-  !
-  ! Compute the unbiased sample variance of valid elements in x.  Uses
-  ! Welford's algorithm for numerical stability.  If fewer than two valid
-  ! values exist, the result is NaN and status=2.  NaN values among valid
-  ! entries cause immediate NaN propagation and status=2.  Invalid arguments
-  ! (n<0) yield status=1.
+  ! FAST mode: No validation, maximum speed
   !--------------------------------------------------------------------------
-  subroutine hpcs_reduce_variance_masked(x, mask, n, out, status) &
-       bind(C, name="hpcs_reduce_variance_masked")
+  subroutine hpcs_reduce_mean_masked_fast(x, mask, n, out, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -169,9 +280,95 @@ contains
     real(c_double), intent(out) :: out
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: n_eff
-    integer(c_int) :: i
-    integer(c_int) :: count
+    integer(c_int) :: i, count
+    real(c_double) :: acc
+
+    ! No input validation - assume valid
+    acc = 0.0_c_double
+    count = 0_c_int
+
+    ! No NaN checks - direct accumulation
+    do i = 1_c_int, n
+      if (mask(i) /= 0_c_int) then
+        acc = acc + x(i)
+        count = count + 1_c_int
+      end if
+    end do
+
+    if (count > 0_c_int) then
+      out = acc / real(count, kind=c_double)
+      status = HPCS_SUCCESS
+    else
+      out = ieee_value(0.0_c_double, ieee_quiet_nan)
+      status = HPCS_ERR_NUMERIC_FAIL
+    end if
+  end subroutine hpcs_reduce_mean_masked_fast
+
+  !--------------------------------------------------------------------------
+  ! DETERMINISTIC mode: Full validation, no SIMD (delegates to SAFE)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_mean_masked_deterministic(x, mask, n, out, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  intent(out):: status
+
+    ! Already sequential, same as SAFE mode
+    call hpcs_reduce_mean_masked_safe(x, mask, n, out, status)
+  end subroutine hpcs_reduce_mean_masked_deterministic
+
+  !--------------------------------------------------------------------------
+  ! hpcs_reduce_variance_masked (v0.8.0 dispatcher with execution mode support)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_variance_masked(x, mask, n, out, mode, status) &
+       bind(C, name="hpcs_reduce_variance_masked")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: effective_mode
+
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_reduce_variance_masked_safe(x, mask, n, out, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_reduce_variance_masked_fast(x, mask, n, out, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_reduce_variance_masked_deterministic(x, mask, n, out, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_reduce_variance_masked
+
+  !--------------------------------------------------------------------------
+  ! SAFE mode: Full NaN detection with Welford's algorithm
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_variance_masked_safe(x, mask, n, out, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: n_eff, i, count
     real(c_double) :: mean, M2, delta, delta2
     logical        :: has_nan
 
@@ -190,9 +387,11 @@ contains
     mean  = 0.0_c_double
     M2    = 0.0_c_double
     has_nan = .false.
+
+    ! Welford's algorithm with NaN detection
     do i = 1_c_int, n_eff
       if (mask(i) /= 0_c_int) then
-        if (x(i) /= x(i)) then
+        if (x(i) /= x(i)) then  ! NaN check
           has_nan = .true.
         else
           count = count + 1_c_int
@@ -203,6 +402,7 @@ contains
         end if
       end if
     end do
+
     if (count < 2_c_int .or. has_nan) then
       out = ieee_value(0.0_c_double, ieee_quiet_nan)
       status = HPCS_ERR_NUMERIC_FAIL
@@ -210,7 +410,63 @@ contains
       out = M2 / real(count - 1_c_int, kind=c_double)
       status = HPCS_SUCCESS
     end if
-  end subroutine hpcs_reduce_variance_masked
+  end subroutine hpcs_reduce_variance_masked_safe
+
+  !--------------------------------------------------------------------------
+  ! FAST mode: No NaN checks, Welford's algorithm (still sequential)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_variance_masked_fast(x, mask, n, out, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: i, count
+    real(c_double) :: mean, M2, delta, delta2
+
+    ! No input validation - assume valid
+    count = 0_c_int
+    mean  = 0.0_c_double
+    M2    = 0.0_c_double
+
+    ! Welford's algorithm without NaN checks
+    do i = 1_c_int, n
+      if (mask(i) /= 0_c_int) then
+        count = count + 1_c_int
+        delta = x(i) - mean
+        mean  = mean + delta / real(count, kind=c_double)
+        delta2 = x(i) - mean
+        M2 = M2 + delta * delta2
+      end if
+    end do
+
+    if (count >= 2_c_int) then
+      out = M2 / real(count - 1_c_int, kind=c_double)
+      status = HPCS_SUCCESS
+    else
+      out = ieee_value(0.0_c_double, ieee_quiet_nan)
+      status = HPCS_ERR_NUMERIC_FAIL
+    end if
+  end subroutine hpcs_reduce_variance_masked_fast
+
+  !--------------------------------------------------------------------------
+  ! DETERMINISTIC mode: Same as SAFE (Welford's is already sequential)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_variance_masked_deterministic(x, mask, n, out, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int), intent(in)  :: mask(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: out
+    integer(c_int),  intent(out):: status
+
+    ! Welford's algorithm is inherently sequential - same as SAFE
+    call hpcs_reduce_variance_masked_safe(x, mask, n, out, status)
+  end subroutine hpcs_reduce_variance_masked_deterministic
 
   !--------------------------------------------------------------------------
   ! hpcs_rolling_mean_masked
@@ -294,7 +550,7 @@ contains
   ! the result (hpcs_median will return NaN).  Invalid arguments (n<0)
   ! yield status=1.
   !--------------------------------------------------------------------------
-  subroutine hpcs_median_masked(x, mask, n, out, status) &
+  subroutine hpcs_median_masked(x, mask, n, out, mode, status) &
        bind(C, name="hpcs_median_masked")
     use iso_c_binding, only: c_int, c_double
     implicit none
@@ -302,12 +558,14 @@ contains
     integer(c_int), intent(in)  :: mask(*)
     integer(c_int),  value      :: n
     real(c_double), intent(out) :: out
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
     integer(c_int) :: n_eff
     integer(c_int) :: i, cnt, st
     real(c_double), allocatable :: buf(:)
     integer(c_int) :: j
+    integer(c_int) :: effective_mode
 
     n_eff = n
     if (n_eff < 0_c_int) then
@@ -319,6 +577,14 @@ contains
       status = HPCS_SUCCESS
       return
     end if
+
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
     ! Count valid entries
     cnt = 0_c_int
     do i = 1_c_int, n_eff
@@ -337,7 +603,7 @@ contains
         j = j + 1_c_int
       end if
     end do
-    call hpcs_median(buf, cnt, out, st)
+    call hpcs_median(buf, cnt, out, effective_mode, st)
     deallocate(buf)
     if (st /= HPCS_SUCCESS) then
       status = st
@@ -355,7 +621,7 @@ contains
   ! NaN and status=2.  Degenerate distributions (MAD≈0) propagate
   ! status=2 from hpcs_mad.  Invalid arguments (n<0) yield status=1.
   !--------------------------------------------------------------------------
-  subroutine hpcs_mad_masked(x, mask, n, out, status) &
+  subroutine hpcs_mad_masked(x, mask, n, out, mode, status) &
        bind(C, name="hpcs_mad_masked")
     use iso_c_binding, only: c_int, c_double
     implicit none
@@ -363,12 +629,14 @@ contains
     integer(c_int), intent(in)  :: mask(*)
     integer(c_int),  value      :: n
     real(c_double), intent(out) :: out
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
     integer(c_int) :: n_eff
     integer(c_int) :: i, cnt, st
     real(c_double), allocatable :: buf(:)
     integer(c_int) :: j
+    integer(c_int) :: effective_mode
 
     n_eff = n
     if (n_eff < 0_c_int) then
@@ -380,6 +648,14 @@ contains
       status = HPCS_SUCCESS
       return
     end if
+
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
     cnt = 0_c_int
     do i = 1_c_int, n_eff
       if (mask(i) /= 0_c_int .and. x(i) == x(i)) cnt = cnt + 1_c_int
@@ -397,7 +673,7 @@ contains
         j = j + 1_c_int
       end if
     end do
-    call hpcs_mad(buf, cnt, out, st)
+    call hpcs_mad(buf, cnt, out, effective_mode, st)
     deallocate(buf)
     status = st
   end subroutine hpcs_mad_masked
@@ -467,7 +743,7 @@ contains
           k = k + 1_c_int
         end if
       end do
-      call hpcs_median(buf, cnt, val, st)
+      call hpcs_median(buf, cnt, val, HPCS_MODE_SAFE, st)
       y(i) = val
       if (st > max_status) max_status = st
     end do

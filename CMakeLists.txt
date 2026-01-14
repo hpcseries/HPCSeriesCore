@@ -129,6 +129,7 @@ set(HPCS_CORE_SOURCES
     src/fortran/hpcs_cpu_detect.f90    # Hardware-aware adaptive parallelization
     src/c/hpcs_cpu_detect.c            # Enhanced CPU detection (C)
     src/c/hpcs_calibrate.c             # v0.5 Benchmark-based auto-tuning
+    src/c/hpcs_version.c               # v0.8.0 Version query functions
     # v0.6 SIMD vectorization modules
     src/c/hpcs_simd_dispatch.c         # SIMD runtime dispatch
     src/c/hpcs_reduce_simd.c           # SIMD reduction kernels (OpenMP)
@@ -157,11 +158,33 @@ endif()
 # v0.4 GPU acceleration infrastructure must come after CUDA runtime
 list(APPEND HPCS_CORE_SOURCES src/fortran/hpcs_core_accel.f90)
 
+# ============================================================================
+# Library Build Options (v0.8.0 - SignalCore C ABI Integration)
+# ============================================================================
+# Build shared library by default for C++ integration (SignalCore).
+# Set to OFF for static library only.
+#
+# Example: cmake -DBUILD_SHARED_LIBS=OFF ..  # Build static library
+# ============================================================================
+option(BUILD_SHARED_LIBS "Build shared library for C++ integration" ON)
+
 # Core library target
-add_library(hpcs_core STATIC ${HPCS_CORE_SOURCES})
+if(BUILD_SHARED_LIBS)
+    add_library(hpcs_core SHARED ${HPCS_CORE_SOURCES})
+    # Set SONAME for proper versioning
+    set_target_properties(hpcs_core PROPERTIES
+        VERSION ${PROJECT_VERSION}                # Full version: libhpcs_core.so.0.8.0
+        SOVERSION ${PROJECT_VERSION_MAJOR}        # SONAME: libhpcs_core.so.0
+    )
+    message(STATUS "Building shared library: libhpcs_core.so.${PROJECT_VERSION}")
+else()
+    add_library(hpcs_core STATIC ${HPCS_CORE_SOURCES})
+    message(STATUS "Building static library: libhpcs_core.a")
+endif()
 
 target_include_directories(hpcs_core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
 # Link OpenMP and C++ stdlib to the library
@@ -175,14 +198,81 @@ if(HPCS_ENABLE_GPU_CUDA AND CMAKE_Fortran_COMPILER_ID MATCHES "PGI|NVHPC")
     target_link_options(hpcs_core PUBLIC -cuda)
 endif()
 
-# Installation rules
+# ============================================================================
+# Installation Rules (v0.8.0 - SignalCore Integration)
+# ============================================================================
+# Installs library and headers with CMake package config for downstream projects.
+# Enables: find_package(hpcs_core CONFIG REQUIRED)
+# ============================================================================
 install(TARGETS hpcs_core
+    EXPORT hpcs_coreTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
 )
 
 install(FILES include/hpcs_core.h
     DESTINATION include
+)
+
+# ============================================================================
+# CMake Package Config (v0.8.0 - SignalCore Integration)
+# ============================================================================
+# Generate CMake package configuration files for downstream consumers.
+# Enables: find_package(hpcs_core CONFIG REQUIRED)
+# Example SignalCore usage:
+#   find_package(hpcs_core 0.8 CONFIG REQUIRED)
+#   target_link_libraries(signalcore PRIVATE hpcs::core)
+# ============================================================================
+include(CMakePackageConfigHelpers)
+
+# Generate package configuration file
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/hpcs_coreConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/hpcs_coreConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/hpcs_core
+)
+
+# Generate version file for compatibility checking
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/hpcs_coreConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+# Install package configuration files
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/hpcs_coreConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/hpcs_coreConfigVersion.cmake"
+    DESTINATION lib/cmake/hpcs_core
+)
+
+# Export targets for find_package()
+install(EXPORT hpcs_coreTargets
+    FILE hpcs_coreTargets.cmake
+    NAMESPACE hpcs::
+    DESTINATION lib/cmake/hpcs_core
+)
+
+# ============================================================================
+# pkg-config Support (Optional Integration Method)
+# ============================================================================
+# Generate pkg-config .pc file for non-CMake build systems
+# (Makefiles, Meson, custom build scripts, etc.)
+#
+# Usage in downstream projects:
+#   CFLAGS += $(shell pkg-config --cflags hpcs_core)
+#   LDFLAGS += $(shell pkg-config --libs hpcs_core)
+# ============================================================================
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/hpcs_core.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/hpcs_core.pc"
+    @ONLY
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/hpcs_core.pc"
+    DESTINATION lib/pkgconfig
 )
 
 # ============================================================================

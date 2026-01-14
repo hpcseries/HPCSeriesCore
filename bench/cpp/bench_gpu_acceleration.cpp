@@ -86,7 +86,7 @@ void bench_median(Mode mode, const vector<int>& sizes) {
             hpcs_accel_free_device(device_ptr, &status);
         } else {
             // CPU path: use standard median
-            hpcs_median(data.data(), n, &median_val, &status);
+            hpcs_median(data.data(), n, &median_val, HPCS_MODE_FAST, &status);
         }
 
         auto end = high_resolution_clock::now();
@@ -117,7 +117,7 @@ void bench_mad(Mode mode, const vector<int>& sizes) {
 
             hpcs_accel_free_device(device_ptr, &status);
         } else {
-            hpcs_mad(data.data(), n, &mad_val, &status);
+            hpcs_mad(data.data(), n, &mad_val, HPCS_MODE_FAST, &status);
         }
 
         auto end = high_resolution_clock::now();
@@ -157,7 +157,7 @@ void bench_rolling_median(Mode mode, const vector<int>& sizes, const vector<int>
                 hpcs_accel_free_device(device_ptr, &status);
                 // Note: device_output is managed by hpcs_accel_rolling_median
             } else {
-                hpcs_rolling_median(data.data(), n, window, output.data(), &status);
+                hpcs_rolling_median(data.data(), n, window, output.data(), HPCS_MODE_FAST, &status);
             }
 
             auto end = high_resolution_clock::now();
@@ -189,7 +189,7 @@ void bench_reduce_sum(Mode mode, const vector<int>& sizes) {
 
             hpcs_accel_free_device(device_ptr, &status);
         } else {
-            hpcs_reduce_sum(data.data(), n, &sum_val, &status);
+            hpcs_reduce_sum(data.data(), n, &sum_val, HPCS_MODE_FAST, &status);
         }
 
         auto end = high_resolution_clock::now();

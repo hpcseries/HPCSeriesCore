@@ -2,7 +2,7 @@
 
 **High-Performance Statistical Computing for Large-Scale Data Analysis**
 
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://readthedocs.org/projects/hpcseries-core/badge/?version=latest)](https://hpcseriescore.readthedocs.io/)
@@ -48,7 +48,7 @@ pip install hpcs
 Verify:
 ```python
 import hpcs
-print(hpcs.__version__)  # 0.7.0
+print(hpcs.__version__)  # 0.8.0
 ```
 
 ### Build from Source
@@ -94,6 +94,142 @@ anomalies = hpcs.detect_anomalies_robust(x, threshold=3.0)
 hpcs.calibrate()
 hpcs.save_calibration_config()
 ```
+
+---
+
+## C++ Integration
+
+**NEW in v0.8.0**: HPCSeries Core now provides a **stable C ABI** for direct consumption from C++ projects, enabling high-performance computation without Python dependencies.
+
+### Why Use Core from C++?
+
+- **Zero Python Overhead**: Direct C++ → C calls with no interpreter
+- **Production Deployment**: Ship C++ binaries without Python runtime
+- **SignalCore Compatible**: Designed for SignalCore and similar C++ libraries
+- **Stable ABI**: Version-tracked compatibility guarantees
+
+### Quick Example
+
+```cpp
+#include <hpcs_core.h>
+#include <vector>
+
+int main() {
+    // Check library version
+    std::cout << "HPCSeries Core " << hpcs_get_version() 
+              << " (ABI " << hpcs_get_abi_version() << ")\n";
+
+    // Compute rolling mean directly from C++
+    std::vector<double> signal = {1.0, 2.0, 3.0, 4.0, 5.0};
+    std::vector<double> output(signal.size());
+    int status;
+
+    hpcs_rolling_mean(signal.data(), signal.size(), 3, 
+                      output.data(), HPCS_MODE_FAST, &status);
+
+    if (status == HPCS_SUCCESS) {
+        // Use output...
+    }
+
+    return 0;
+}
+```
+
+### Installation for C++
+
+```bash
+# Clone and build
+git clone https://github.com/hpcseries/HPCSeriesCore.git
+cd HPCSeriesCore
+mkdir build && cd build
+
+# Configure with shared library
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_SHARED_LIBS=ON \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      ..
+
+# Build and install
+make -j$(nproc)
+sudo make install
+```
+
+This installs:
+- `libhpcs_core.so.0.8.0` - Shared library with SONAME versioning
+- `hpcs_core.h` - Public C API header
+- CMake package config (for `find_package(hpcs_core)`)
+- pkg-config support (for non-CMake projects)
+
+### Integration Methods
+
+**Option A: CMake find_package() (Recommended)**
+
+```cmake
+find_package(hpcs_core 0.8 CONFIG REQUIRED)
+target_link_libraries(myapp PRIVATE hpcs::hpcs_core)
+```
+
+**Option B: CMake Submodule**
+
+```cmake
+add_subdirectory(external/HPCSeriesCore)
+target_link_libraries(myapp PRIVATE hpcs_core)
+```
+
+**Option C: pkg-config**
+
+```bash
+gcc myapp.c $(pkg-config --cflags --libs hpcs_core) -o myapp
+```
+
+### Performance
+
+All 31 Core kernels support three execution modes:
+
+| Mode | Use Case | Speedup |
+|------|----------|---------|
+| **SAFE** | Development, debugging | 1.0x (baseline) |
+| **FAST** | Production (recommended) | **1.1-33x** |
+| **DETERMINISTIC** | Testing, reproducibility | 0.5-1.0x |
+
+Example benchmark (rolling_sum, n=10M, window=100):
+- SAFE: 145ms
+- FAST: 4.4ms (**32.8x speedup**)
+
+### Documentation
+
+- **[C API Reference](docs/C_API.md)** - Complete function reference
+- **[Integration Guide](docs/INTEGRATION.md)** - Build system integration
+- **[C++ Example](examples/cpp/signalcore_example.cpp)** - Full working example
+
+### Execution Modes
+
+```cpp
+// Development: Full validation
+hpcs_rolling_mean(data, n, w, out, HPCS_MODE_SAFE, &status);
+
+// Production: Maximum performance
+hpcs_rolling_mean(data, n, w, out, HPCS_MODE_FAST, &status);
+
+// Testing: Reproducible results
+hpcs_rolling_mean(data, n, w, out, HPCS_MODE_DETERMINISTIC, &status);
+```
+
+### Available Functions (31 Total)
+
+**Rolling Operations**: `rolling_sum`, `rolling_mean`, `rolling_variance`, `rolling_std`
+
+**Reductions**: `reduce_sum`, `reduce_mean`, `reduce_std`, `reduce_min`, `reduce_max`
+
+**2D Operations**: `reduce_sum_axis1`, `reduce_mean_axis1`, `median_axis1`, `mad_axis1`
+
+**Masked Operations**: `reduce_sum_masked`, `reduce_mean_masked`, `median_masked`
+
+**Transformations**: `zscore`, `normalize_minmax`, `fill_forward`, `fill_backward`
+
+**Specialized**: `detect_anomalies`, `prefix_sum`, `where`
+
+See [C_API.md](docs/C_API.md) for complete reference.
 
 ---
 
@@ -206,14 +342,14 @@ This license enables both open-source collaboration and commercial applications,
 If you use HPCSeries Core in your research, please cite:
 
 ```bibtex
-@software{hpcseries_core_2025,
+@software{hpcseries_core_2026,
   title = {HPCSeries Core: High-Performance Statistical Computing for Large-Scale Data Analysis},
   author = {HPCSeries Core Contributors},
-  year = {2025},
-  month = {12},
-  version = {0.7.0},
+  year = {2026},
+  month = {1},
+  version = {0.8.0},
   url = {https://github.com/hpcseries/HPCSeriesCore},
-  license = {MIT}
+  license = {Apache-2.0}
 }
 ```
 
