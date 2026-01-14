@@ -66,7 +66,7 @@ contains
     integer(c_int),  intent(out):: status
 
     ! For v0.2 we simply delegate to the serial kernel.
-    call hpcs_rolling_sum(x, n, window, y, status)
+    call hpcs_rolling_sum(x, n, window, y, HPCS_MODE_SAFE, status)
   end subroutine hpcs_rolling_sum_parallel
 
   !--------------------------------------------------------------------
@@ -85,7 +85,7 @@ contains
     real(c_double), intent(out) :: y(*)      ! length >= n
     integer(c_int),  intent(out):: status
 
-    call hpcs_rolling_mean(x, n, window, y, status)
+    call hpcs_rolling_mean(x, n, window, y, HPCS_MODE_SAFE, status)
   end subroutine hpcs_rolling_mean_parallel
 
   !====================================================================

@@ -32,6 +32,7 @@ module hpcs_core_stats
   use iso_c_binding, only: c_int, c_double
   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
   use hpcs_constants
+  use hpcs_core_execution_mode, only: hpcs_get_execution_mode_internal
   implicit none
   private
   public :: hpcs_median
@@ -41,7 +42,7 @@ module hpcs_core_stats
 contains
 
   !--------------------------------------------------------------------------
-  ! hpcs_median
+  ! hpcs_median - Dispatcher with execution mode support (v0.8.0 Phase 2)
   !
   ! Compute the median of a 1-D array.  For even-length arrays the median is
   ! defined as the average of the two middle order statistics.  NaNs in the
@@ -53,14 +54,48 @@ contains
   !   x      - const double*      input array of length n
   !   n      - int               number of elements
   !   median - double*           output scalar median
+  !   mode   - int               execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
   !   status - int*              output status code
   !
   ! Status codes:
   !   HPCS_SUCCESS          (0) : success
-  !   HPCS_ERR_INVALID_ARGS (1) : n <= 0
+  !   HPCS_ERR_INVALID_ARGS (1) : n <= 0 or invalid mode
   !
   !--------------------------------------------------------------------------
-  subroutine hpcs_median(x, n, median, status) bind(C, name="hpcs_median")
+  subroutine hpcs_median(x, n, median, mode, status) bind(C, name="hpcs_median")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: median
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+    integer(c_int)              :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_median_safe(x, n, median, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_median_fast(x, n, median, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_median_deterministic(x, n, median, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_median
+
+  !--------------------------------------------------------------------------
+  ! hpcs_median_safe - SAFE mode implementation
+  !--------------------------------------------------------------------------
+  subroutine hpcs_median_safe(x, n, median, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -120,10 +155,124 @@ contains
 
     status = HPCS_SUCCESS
     deallocate(tmp)
-  end subroutine hpcs_median
+  end subroutine hpcs_median_safe
 
   !--------------------------------------------------------------------------
-  ! hpcs_mad
+  ! hpcs_median_fast - FAST mode implementation (no NaN checks)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_median_fast(x, n, median, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: median
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)            :: n_eff, k1, k2
+    real(c_double), allocatable :: tmp(:)
+    real(c_double)            :: v1, v2
+    integer(c_int)            :: i
+
+    n_eff = n
+    if (n_eff <= 0_c_int) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Allocate and copy (no NaN checks in FAST mode)
+    allocate(tmp(n_eff))
+    do i = 1_c_int, n_eff
+      tmp(i) = x(i)
+    end do
+
+    ! Determine positions of the middle elements
+    k1 = (n_eff - 1_c_int) / 2_c_int
+    k2 = n_eff / 2_c_int
+
+    ! Quickselect the k1+1-th smallest element
+    call quickselect(tmp, 1_c_int, n_eff, k1 + 1_c_int)
+    v1 = tmp(k1 + 1_c_int)
+
+    ! If n is even, select the k2+1-th smallest as well
+    if (k2 /= k1) then
+      call quickselect(tmp, 1_c_int, n_eff, k2 + 1_c_int)
+      v2 = tmp(k2 + 1_c_int)
+      median = 0.5_c_double * (v1 + v2)
+    else
+      median = v1
+    end if
+
+    status = HPCS_SUCCESS
+    deallocate(tmp)
+  end subroutine hpcs_median_fast
+
+  !--------------------------------------------------------------------------
+  ! hpcs_median_deterministic - DETERMINISTIC mode (same as SAFE, no OpenMP)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_median_deterministic(x, n, median, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: median
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)            :: n_eff, k1, k2
+    real(c_double), allocatable :: tmp(:)
+    real(c_double)            :: v1, v2
+    integer(c_int)            :: i
+    logical                   :: has_nan
+
+    n_eff = n
+    if (n_eff <= 0_c_int) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Allocate a local copy of the data
+    allocate(tmp(n_eff))
+    do i = 1_c_int, n_eff
+      tmp(i) = x(i)
+    end do
+
+    ! Check for NaN in the copy (deterministic NaN detection)
+    has_nan = .false.
+    do i = 1_c_int, n_eff
+      if (tmp(i) /= tmp(i)) then
+        has_nan = .true.
+        exit
+      end if
+    end do
+    if (has_nan) then
+      median = ieee_value(0.0_c_double, ieee_quiet_nan)
+      status = HPCS_SUCCESS
+      deallocate(tmp)
+      return
+    end if
+
+    ! Determine positions of the middle elements
+    k1 = (n_eff - 1_c_int) / 2_c_int
+    k2 = n_eff / 2_c_int
+
+    ! Quickselect the k1+1-th smallest element
+    call quickselect(tmp, 1_c_int, n_eff, k1 + 1_c_int)
+    v1 = tmp(k1 + 1_c_int)
+
+    ! If n is even, select the k2+1-th smallest as well
+    if (k2 /= k1) then
+      call quickselect(tmp, 1_c_int, n_eff, k2 + 1_c_int)
+      v2 = tmp(k2 + 1_c_int)
+      median = 0.5_c_double * (v1 + v2)
+    else
+      median = v1
+    end if
+
+    status = HPCS_SUCCESS
+    deallocate(tmp)
+  end subroutine hpcs_median_deterministic
+
+  !--------------------------------------------------------------------------
+  ! hpcs_mad - Dispatcher with execution mode support (v0.8.0 Phase 2)
   !
   ! Compute the median absolute deviation (MAD) of a 1-D array.  The MAD is
   ! defined as the median of the absolute deviations from the median of the
@@ -133,16 +282,50 @@ contains
   ! deviations.
   !
   ! Arguments (C view):
-  !   x   - const double*      input array of length n
-  !   n   - int               number of elements
-  !   mad - double*           output scalar MAD
-  !   st  - int*              output status code
+  !   x    - const double*      input array of length n
+  !   n    - int               number of elements
+  !   mad  - double*           output scalar MAD
+  !   mode - int               execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
+  !   st   - int*              output status code
   !
   ! Status codes:
   !   HPCS_SUCCESS          (0) : success
-  !   HPCS_ERR_INVALID_ARGS (1) : n <= 0
+  !   HPCS_ERR_INVALID_ARGS (1) : n <= 0 or invalid mode
   !--------------------------------------------------------------------------
-  subroutine hpcs_mad(x, n, mad, status) bind(C, name="hpcs_mad")
+  subroutine hpcs_mad(x, n, mad, mode, status) bind(C, name="hpcs_mad")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: mad
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+    integer(c_int)              :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_mad_safe(x, n, mad, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_mad_fast(x, n, mad, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_mad_deterministic(x, n, mad, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_mad
+
+  !--------------------------------------------------------------------------
+  ! hpcs_mad_safe - SAFE mode implementation
+  !--------------------------------------------------------------------------
+  subroutine hpcs_mad_safe(x, n, mad, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -163,7 +346,7 @@ contains
     end if
 
     ! Compute the median; this also handles NaN propagation
-    call hpcs_median(x, n_eff, med, st)
+    call hpcs_median(x, n_eff, med, HPCS_MODE_SAFE, st)
     if (st /= HPCS_SUCCESS) then
       ! invalid args propagate directly
       mad    = 0.0_c_double
@@ -196,7 +379,7 @@ contains
     end if
 
     ! Median of deviations
-    call hpcs_median(dev, n_eff, mad, st)
+    call hpcs_median(dev, n_eff, mad, HPCS_MODE_SAFE, st)
     if (st /= HPCS_SUCCESS) then
       mad    = 0.0_c_double
       status = st
@@ -207,10 +390,126 @@ contains
     ! MAD computed successfully (MAD = 0 is valid for constant data)
     status = HPCS_SUCCESS
     deallocate(dev)
-  end subroutine hpcs_mad
+  end subroutine hpcs_mad_safe
 
   !--------------------------------------------------------------------------
-  ! hpcs_quantile
+  ! hpcs_mad_fast - FAST mode implementation (no NaN checks)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_mad_fast(x, n, mad, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: mad
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, st
+    real(c_double)             :: med
+    real(c_double), allocatable :: dev(:)
+    integer(c_int)             :: i
+
+    n_eff = n
+    if (n_eff <= 0_c_int) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Compute the median (no NaN checks in FAST mode)
+    call hpcs_median(x, n_eff, med, HPCS_MODE_FAST, st)
+    if (st /= HPCS_SUCCESS) then
+      mad    = 0.0_c_double
+      status = st
+      return
+    end if
+
+    ! Allocate deviation array (no NaN checks)
+    allocate(dev(n_eff))
+    do i = 1_c_int, n_eff
+      dev(i) = abs(x(i) - med)
+    end do
+
+    ! Median of deviations
+    call hpcs_median(dev, n_eff, mad, HPCS_MODE_FAST, st)
+    if (st /= HPCS_SUCCESS) then
+      mad    = 0.0_c_double
+      status = st
+      deallocate(dev)
+      return
+    end if
+
+    status = HPCS_SUCCESS
+    deallocate(dev)
+  end subroutine hpcs_mad_fast
+
+  !--------------------------------------------------------------------------
+  ! hpcs_mad_deterministic - DETERMINISTIC mode (same as SAFE)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_mad_deterministic(x, n, mad, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double), intent(out) :: mad
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, st
+    real(c_double)             :: med
+    real(c_double), allocatable :: dev(:)
+    integer(c_int)             :: i
+    logical                    :: has_nan
+
+    n_eff = n
+    if (n_eff <= 0_c_int) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Compute the median; this also handles NaN propagation
+    call hpcs_median(x, n_eff, med, HPCS_MODE_DETERMINISTIC, st)
+    if (st /= HPCS_SUCCESS) then
+      mad    = 0.0_c_double
+      status = st
+      return
+    end if
+
+    ! If median is NaN, then MAD is also NaN
+    if (med /= med) then
+      mad    = med
+      status = HPCS_SUCCESS
+      return
+    end if
+
+    ! Allocate deviation array
+    allocate(dev(n_eff))
+    has_nan = .false.
+    do i = 1_c_int, n_eff
+      dev(i) = abs(x(i) - med)
+      if (dev(i) /= dev(i)) then
+        has_nan = .true.
+      end if
+    end do
+    if (has_nan) then
+      mad    = ieee_value(0.0_c_double, ieee_quiet_nan)
+      status = HPCS_SUCCESS
+      deallocate(dev)
+      return
+    end if
+
+    ! Median of deviations
+    call hpcs_median(dev, n_eff, mad, HPCS_MODE_DETERMINISTIC, st)
+    if (st /= HPCS_SUCCESS) then
+      mad    = 0.0_c_double
+      status = st
+      deallocate(dev)
+      return
+    end if
+
+    status = HPCS_SUCCESS
+    deallocate(dev)
+  end subroutine hpcs_mad_deterministic
+
+  !--------------------------------------------------------------------------
+  ! hpcs_quantile - Dispatcher with execution mode support (v0.8.0 Phase 2)
   !
   ! Compute the q-th quantile (0 <= q <= 1) of a 1-D array using the Type 7
   ! definition (linear interpolation between order statistics).  For q=0 the
@@ -225,13 +524,48 @@ contains
   !   n     - int             number of elements
   !   q     - double          quantile in [0,1]
   !   value - double*         output quantile value
+  !   mode  - int             execution mode (0=SAFE, 1=FAST, 2=DETERMINISTIC, -1=use global)
   !   st    - int*            output status code
   !
   ! Status codes:
   !   HPCS_SUCCESS          (0) : success
-  !   HPCS_ERR_INVALID_ARGS (1) : n <= 0 or q outside [0,1]
+  !   HPCS_ERR_INVALID_ARGS (1) : n <= 0 or q outside [0,1] or invalid mode
   !--------------------------------------------------------------------------
-  subroutine hpcs_quantile(x, n, q, value, status) bind(C, name="hpcs_quantile")
+  subroutine hpcs_quantile(x, n, q, value, mode, status) bind(C, name="hpcs_quantile")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double),  value      :: q
+    real(c_double), intent(out) :: value
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+    integer(c_int)              :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_quantile_safe(x, n, q, value, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_quantile_fast(x, n, q, value, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_quantile_deterministic(x, n, q, value, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_quantile
+
+  !--------------------------------------------------------------------------
+  ! hpcs_quantile_safe - SAFE mode implementation
+  !--------------------------------------------------------------------------
+  subroutine hpcs_quantile_safe(x, n, q, value, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -309,7 +643,158 @@ contains
 
     status = HPCS_SUCCESS
     deallocate(tmp)
-  end subroutine hpcs_quantile
+  end subroutine hpcs_quantile_safe
+
+  !--------------------------------------------------------------------------
+  ! hpcs_quantile_fast - FAST mode implementation (no NaN checks)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_quantile_fast(x, n, q, value, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double),  value      :: q
+    real(c_double), intent(out) :: value
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, k, k2, st
+    real(c_double)             :: h, delta, x_k, x_k1
+    real(c_double), allocatable :: tmp(:)
+    integer(c_int)             :: i
+
+    n_eff = n
+    if (n_eff <= 0_c_int) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+    if (q < 0.0_c_double .or. q > 1.0_c_double) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Copy input data (no NaN check in FAST mode)
+    allocate(tmp(n_eff))
+    do i = 1_c_int, n_eff
+      tmp(i) = x(i)
+    end do
+
+    ! Compute the fractional index h (1-based indexing)
+    h = (real(n_eff - 1_c_int, c_double) * q) + 1.0_c_double
+    k = floor(h)
+    delta = h - real(k, c_double)
+
+    ! Boundaries: ensure k is within [1, n]
+    if (k < 1_c_int) then
+      k2 = 1_c_int
+      call quickselect(tmp, 1_c_int, n_eff, k2)
+      x_k  = tmp(k2)
+      x_k1 = x_k
+    else if (k >= n_eff) then
+      k2 = n_eff
+      call quickselect(tmp, 1_c_int, n_eff, k2)
+      x_k  = tmp(k2)
+      x_k1 = x_k
+    else
+      ! get k-th and (k+1)-th order statistics
+      call quickselect(tmp, 1_c_int, n_eff, k)
+      x_k = tmp(k)
+      call quickselect(tmp, 1_c_int, n_eff, k + 1_c_int)
+      x_k1 = tmp(k + 1_c_int)
+    end if
+
+    ! Interpolate if necessary
+    if (delta <= 0.0_c_double) then
+      value = x_k
+    else
+      value = x_k + delta * (x_k1 - x_k)
+    end if
+
+    status = HPCS_SUCCESS
+    deallocate(tmp)
+  end subroutine hpcs_quantile_fast
+
+  !--------------------------------------------------------------------------
+  ! hpcs_quantile_deterministic - DETERMINISTIC mode (NaN checks, bit-exact)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_quantile_deterministic(x, n, q, value, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    real(c_double),  value      :: q
+    real(c_double), intent(out) :: value
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, k, k2, st
+    real(c_double)             :: h, delta, x_k, x_k1
+    real(c_double), allocatable :: tmp(:)
+    integer(c_int)             :: i
+    logical                    :: has_nan
+
+    n_eff = n
+    if (n_eff <= 0_c_int) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+    if (q < 0.0_c_double .or. q > 1.0_c_double) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Copy input data
+    allocate(tmp(n_eff))
+    do i = 1_c_int, n_eff
+      tmp(i) = x(i)
+    end do
+    ! Check for NaN
+    has_nan = .false.
+    do i = 1_c_int, n_eff
+      if (tmp(i) /= tmp(i)) then
+        has_nan = .true.
+        exit
+      end if
+    end do
+    if (has_nan) then
+      value  = ieee_value(0.0_c_double, ieee_quiet_nan)
+      status = HPCS_SUCCESS
+      deallocate(tmp)
+      return
+    end if
+
+    ! Compute the fractional index h (1-based indexing)
+    h = (real(n_eff - 1_c_int, c_double) * q) + 1.0_c_double
+    k = floor(h)
+    delta = h - real(k, c_double)
+
+    ! Boundaries: ensure k is within [1, n]
+    if (k < 1_c_int) then
+      k2 = 1_c_int
+      call quickselect(tmp, 1_c_int, n_eff, k2)
+      x_k  = tmp(k2)
+      x_k1 = x_k
+    else if (k >= n_eff) then
+      k2 = n_eff
+      call quickselect(tmp, 1_c_int, n_eff, k2)
+      x_k  = tmp(k2)
+      x_k1 = x_k
+    else
+      ! get k-th and (k+1)-th order statistics
+      call quickselect(tmp, 1_c_int, n_eff, k)
+      x_k = tmp(k)
+      call quickselect(tmp, 1_c_int, n_eff, k + 1_c_int)
+      x_k1 = tmp(k + 1_c_int)
+    end if
+
+    ! Interpolate if necessary
+    if (delta <= 0.0_c_double) then
+      value = x_k
+    else
+      value = x_k + delta * (x_k1 - x_k)
+    end if
+
+    status = HPCS_SUCCESS
+    deallocate(tmp)
+  end subroutine hpcs_quantile_deterministic
 
   !--------------------------------------------------------------------------
   ! Internal helper: quickselect

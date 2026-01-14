@@ -1,6 +1,6 @@
 # HPCSeries Core — Example Notebooks
 
-This directory contains **12 Jupyter notebooks** demonstrating the capabilities of HPCSeries Core v0.7.
+This directory contains **13 Jupyter notebooks** demonstrating the capabilities of HPCSeries Core v0.8.0.
 
 ## Overview
 
@@ -13,6 +13,7 @@ These notebooks showcase:
 - **Performance optimization** — calibration and benchmarking
 - **Migration guides** — NumPy/Pandas to HPCSeries
 - **Real-world applications** — Industry-specific use cases
+- **Pipeline API (v0.8.0)** — Composable kernel execution for multi-stage processing
 
 ---
 
@@ -234,6 +235,38 @@ These notebooks showcase:
 
 ---
 
+### 11. Pipeline API (v0.8.0) ✅ **NEW**
+**File**: [`11_pipeline_api.ipynb`](11_pipeline_api.ipynb)
+
+**What you'll learn**:
+- Composable kernel execution for multi-stage data processing
+- 12 predefined pipeline stages for common transformations
+- Ping-pong buffer management for efficient memory reuse
+- Three execution modes: SAFE, FAST, DETERMINISTIC
+- Workspace support for memory-intensive pipelines
+- Pipeline vs manual chaining performance comparison
+
+**Key HPCSeries features**:
+- `hpcs.pipeline(mode='fast')` - Create pipeline with execution mode
+- Fluent API: `.diff()`, `.ewma()`, `.robust_zscore()`, etc.
+- `pipe.execute(x)` - Execute pipeline on input data
+- `pipe.summary()` - Human-readable pipeline description
+- `hpcs.workspace(bytes)` - Pre-allocated memory pools
+- `hpcs.build_features()` - Runtime feature discovery
+
+**Pipeline stages (12 operations)**:
+- **Transforms**: `diff`, `ewma`, `ewvar`, `ewstd`
+- **Rolling**: `rolling_mean`, `rolling_std`, `rolling_median`, `rolling_mad`
+- **Normalization**: `zscore`, `robust_zscore`, `normalize_minmax`, `clip`
+
+**Why use pipelines?**
+- Automatic intermediate buffer management
+- Reduced memory allocations vs manual chaining
+- Clean, readable multi-stage workflows
+- Real-world anomaly detection example
+
+---
+
 ## Case Studies
 
 ### Kaggle Store Sales Forecasting Competition ✅
@@ -261,7 +294,7 @@ These notebooks showcase:
 
 ### Prerequisites
 
-Install HPCSeries Core v0.7:
+Install HPCSeries Core v0.8.0:
 
 ```bash
 # From repository root

@@ -62,7 +62,7 @@ contains
 
     ! Small arrays: use serial version
     if (n_eff < PARALLEL_THRESHOLD) then
-      call hpcs_median(x, n_eff, median, status)
+      call hpcs_median(x, n_eff, median, HPCS_MODE_SAFE, status)
       return
     end if
 
@@ -143,7 +143,7 @@ contains
 
     ! Small arrays: use serial version
     if (n_eff < PARALLEL_THRESHOLD) then
-      call hpcs_mad(x, n_eff, mad, status)
+      call hpcs_mad(x, n_eff, mad, HPCS_MODE_SAFE, status)
       return
     end if
 
@@ -188,7 +188,7 @@ contains
     end if
 
     ! Median of deviations (serial median is fine here, dev is a copy)
-    call hpcs_median(dev, n_eff, mad, st)
+    call hpcs_median(dev, n_eff, mad, HPCS_MODE_SAFE, st)
     if (st /= HPCS_SUCCESS) then
       mad    = 0.0_c_double
       status = st
@@ -229,7 +229,7 @@ contains
 
     ! Small arrays: use serial version
     if (n_eff < PARALLEL_THRESHOLD) then
-      call hpcs_quantile(x, n_eff, q, value, status)
+      call hpcs_quantile(x, n_eff, q, value, HPCS_MODE_SAFE, status)
       return
     end if
 

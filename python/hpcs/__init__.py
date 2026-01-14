@@ -1,9 +1,9 @@
 """
-HPCSeries Core v0.8 - Python Bindings
+HPCSeries Core v0.9 - Python Bindings
 ======================================
 
 High-performance statistical computing library with SIMD vectorization,
-OpenMP parallelization, and adaptive auto-tuning.
+OpenMP parallelization, adaptive auto-tuning, and composable pipelines.
 
 Examples
 --------
@@ -27,6 +27,12 @@ Examples
 
 # Anomaly detection
 >>> anomalies = hpcs.detect_anomalies(x, threshold=3.0)
+
+# v0.8.0: Composable pipelines
+>>> pipe = hpcs.pipeline(mode='fast')
+>>> pipe.diff(order=1).ewma(alpha=0.2).robust_zscore()
+>>> result = pipe.execute(x)
+>>> print(pipe.summary())
 """
 
 __version__ = "0.8.0"
@@ -42,7 +48,7 @@ from hpcs._core import (
     min,
     max,
 
-    # Grouped reductions (v0.8.0 Phase 1)
+
     group_sum,
     group_mean,
     group_var,
@@ -58,7 +64,7 @@ from hpcs._core import (
     normalize_minmax,
     clip,
 
-    # Extended transforms & descriptive statistics (v0.8.0)
+    # Extended transforms & descriptive statistics
     ewma,
     ewvar,
     ewstd,
@@ -69,7 +75,7 @@ from hpcs._core import (
     trimmed_mean,
     winsorized_mean,
 
-    # Execution mode API (v0.8.0)
+    # Execution mode API
     set_execution_mode,
     get_execution_mode,
     MODE_SAFE,
@@ -90,7 +96,7 @@ from hpcs._core import (
     rolling_zscore,
     rolling_robust_zscore,
 
-    # 2D Axis operations (Tier B)
+    # 2D Axis operations
     axis_sum,
     axis_mean,
     axis_median,
@@ -106,7 +112,7 @@ from hpcs._core import (
     rolling_mean_batched,
     rolling_mean_masked,
 
-    # Masked operations (Tier B)
+    # Masked operations
     sum_masked,
     mean_masked,
     var_masked,
@@ -128,6 +134,26 @@ from hpcs._core import (
     load_calibration_config,
 )
 
+# Import pipeline, workspace, and feature discovery (v0.8.0)
+from hpcs._core import (
+    # Pipeline API
+    pipeline,
+    workspace,
+
+    # Feature discovery
+    build_features,
+    last_error,
+
+    # Feature bitmask constants
+    FEAT_OPENMP,
+    FEAT_SIMD_AVX2,
+    FEAT_SIMD_AVX512,
+    FEAT_SIMD_NEON,
+    FEAT_FAST_MATH,
+    FEAT_GPU_OFFLOAD,
+    FEAT_CALIBRATED,
+)
+
 # Public API
 __all__ = [
     # Version
@@ -141,7 +167,7 @@ __all__ = [
     "min",
     "max",
 
-    # Grouped reductions (v0.8.0 Phase 1)
+    # Grouped reductions
     "group_sum",
     "group_mean",
     "group_var",
@@ -157,7 +183,7 @@ __all__ = [
     "normalize_minmax",
     "clip",
 
-    # Extended transforms & descriptive statistics (v0.8.0)
+    # Extended transforms & descriptive statistics
     "ewma",
     "ewvar",
     "ewstd",
@@ -168,7 +194,7 @@ __all__ = [
     "trimmed_mean",
     "winsorized_mean",
 
-    # Execution mode API (v0.8.0)
+    # Execution mode API
     "set_execution_mode",
     "get_execution_mode",
     "MODE_SAFE",
@@ -189,7 +215,7 @@ __all__ = [
     "rolling_zscore",
     "rolling_robust_zscore",
 
-    # 2D Axis operations (Tier B)
+    # 2D Axis operations
     "axis_sum",
     "axis_mean",
     "axis_median",
@@ -205,7 +231,7 @@ __all__ = [
     "rolling_mean_batched",
     "rolling_mean_masked",
 
-    # Masked operations (Tier B)
+    # Masked operations
     "sum_masked",
     "mean_masked",
     "var_masked",
@@ -221,4 +247,19 @@ __all__ = [
     "calibrate",
     "save_calibration_config",
     "load_calibration_config",
+
+    # Pipeline API (v0.8.0)
+    "pipeline",
+    "workspace",
+
+    # Feature discovery (v0.8.0)
+    "build_features",
+    "last_error",
+    "FEAT_OPENMP",
+    "FEAT_SIMD_AVX2",
+    "FEAT_SIMD_AVX512",
+    "FEAT_SIMD_NEON",
+    "FEAT_FAST_MATH",
+    "FEAT_GPU_OFFLOAD",
+    "FEAT_CALIBRATED",
 ]

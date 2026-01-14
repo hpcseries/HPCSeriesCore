@@ -55,7 +55,7 @@ int main() {
         {
             // Original
             auto start = std::chrono::high_resolution_clock::now();
-            hpcs_median(data.data(), n, &scalar_result, &status);
+            hpcs_median(data.data(), n, &scalar_result, HPCS_MODE_FAST, &status);
             auto end = std::chrono::high_resolution_clock::now();
             double elapsed_orig = std::chrono::duration<double>(end - start).count();
 
@@ -77,7 +77,7 @@ int main() {
         {
             // Original
             auto start = std::chrono::high_resolution_clock::now();
-            hpcs_mad(data.data(), n, &scalar_result, &status);
+            hpcs_mad(data.data(), n, &scalar_result, HPCS_MODE_FAST, &status);
             auto end = std::chrono::high_resolution_clock::now();
             double elapsed_orig = std::chrono::duration<double>(end - start).count();
 
@@ -101,7 +101,7 @@ int main() {
 
             // Original
             auto start = std::chrono::high_resolution_clock::now();
-            hpcs_quantile(data.data(), n, q, &scalar_result, &status);
+            hpcs_quantile(data.data(), n, q, &scalar_result, HPCS_MODE_FAST, &status);
             auto end = std::chrono::high_resolution_clock::now();
             double elapsed_orig = std::chrono::duration<double>(end - start).count();
 
@@ -150,7 +150,7 @@ int main() {
 
             // Original
             auto start = std::chrono::high_resolution_clock::now();
-            hpcs_rolling_median(data.data(), n, window, rolling_out.data(), &status);
+            hpcs_rolling_median(data.data(), n, window, rolling_out.data(), HPCS_MODE_FAST, &status);
             auto end = std::chrono::high_resolution_clock::now();
             double elapsed_orig = std::chrono::duration<double>(end - start).count();
 
@@ -174,7 +174,7 @@ int main() {
 
             // Original
             auto start = std::chrono::high_resolution_clock::now();
-            hpcs_rolling_mad(data.data(), n, window, rolling_out.data(), &status);
+            hpcs_rolling_mad(data.data(), n, window, rolling_out.data(), HPCS_MODE_FAST, &status);
             auto end = std::chrono::high_resolution_clock::now();
             double elapsed_orig = std::chrono::duration<double>(end - start).count();
 

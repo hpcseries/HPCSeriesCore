@@ -124,13 +124,13 @@ contains
     end if
 
     ! Compute lower bound
-    call hpcs_quantile(x, n_eff, q_low, lowBound, st)
+    call hpcs_quantile(x, n_eff, q_low, lowBound, HPCS_MODE_SAFE, st)
     if (st /= HPCS_SUCCESS) then
       status = st
       return
     end if
     ! Compute upper bound
-    call hpcs_quantile(x, n_eff, q_high, highBound, st)
+    call hpcs_quantile(x, n_eff, q_high, highBound, HPCS_MODE_SAFE, st)
     if (st /= HPCS_SUCCESS) then
       status = st
       return
@@ -203,13 +203,13 @@ contains
     end if
 
     ! Compute median
-    call hpcs_median(x, n_eff, med, st)
+    call hpcs_median(x, n_eff, med, HPCS_MODE_SAFE, st)
     if (st /= HPCS_SUCCESS) then
       status = st
       return
     end if
     ! Compute MAD
-    call hpcs_mad(x, n_eff, mad_val, st)
+    call hpcs_mad(x, n_eff, mad_val, HPCS_MODE_SAFE, st)
     if (st == HPCS_ERR_NUMERIC_FAIL) then
       ! Degenerate distribution: fill y with NaNs
       do i = 1_c_int, n_eff
@@ -287,14 +287,14 @@ contains
     end if
 
     ! Compute median
-    call hpcs_median(x, n_eff, med, st)
+    call hpcs_median(x, n_eff, med, HPCS_MODE_SAFE, st)
     if (st /= HPCS_SUCCESS) then
       status = st
       return
     end if
 
     ! Compute MAD
-    call hpcs_mad(x, n_eff, mad_val, st)
+    call hpcs_mad(x, n_eff, mad_val, HPCS_MODE_SAFE, st)
     if (st == HPCS_ERR_NUMERIC_FAIL) then
       ! MAD = 0: all values equal median, no anomalies possible
       do i = 1_c_int, n_eff

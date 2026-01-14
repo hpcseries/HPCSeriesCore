@@ -1,0 +1,28 @@
+#
+# pkg-config file for HPCSeries Core
+#
+# Enables non-CMake build systems to find and link against HPCSeries Core
+# using: pkg-config --cflags --libs hpcs_core
+#
+# Example usage in Makefile:
+#   CFLAGS += $(shell pkg-config --cflags hpcs_core)
+#   LDFLAGS += $(shell pkg-config --libs hpcs_core)
+#
+# Example usage in custom build scripts:
+#   cc myapp.c $(pkg-config --cflags --libs hpcs_core) -o myapp
+#
+
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: HPCSeries Core
+Description: High-performance time series computation kernels with NASA-level quality
+URL: https://github.com/hpcseries/HPCSeriesCore
+Version: @PROJECT_VERSION@
+Requires:
+Requires.private:
+Libs: -L${libdir} -lhpcs_core
+Libs.private: -lgomp -lgfortran -lm -lstdc++
+Cflags: -I${includedir}

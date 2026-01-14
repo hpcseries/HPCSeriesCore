@@ -32,12 +32,16 @@ class BuildNativeLibrary(build_ext):
 
     def run(self):
         """Build native library, then build Python extensions."""
-        # Check if native library exists, build if not
-        lib_path = Path("build/libhpcs_core.a")
+        # Check if native library exists (shared or static), build if not
+        lib_path_shared = Path("build/libhpcs_core.so")
+        lib_path_static = Path("build/libhpcs_core.a")
 
-        if not lib_path.exists():
+        lib_exists = lib_path_shared.exists() or lib_path_static.exists()
+        lib_path = lib_path_shared if lib_path_shared.exists() else lib_path_static
+
+        if not lib_exists:
             print("\n" + "="*80)
-            print("Building native library (libhpcs_core.a)...")
+            print("Building native library (libhpcs_core)...")
             print("="*80 + "\n")
 
             # Check for required tools
@@ -46,10 +50,15 @@ class BuildNativeLibrary(build_ext):
             # Build native library with CMake
             self._build_native_library()
 
-            # Verify library was built
-            if not lib_path.exists():
+            # Verify library was built (check for either shared or static)
+            lib_path_shared = Path("build/libhpcs_core.so")
+            lib_path_static = Path("build/libhpcs_core.a")
+            lib_exists = lib_path_shared.exists() or lib_path_static.exists()
+            lib_path = lib_path_shared if lib_path_shared.exists() else lib_path_static
+
+            if not lib_exists:
                 raise RuntimeError(
-                    f"Native library build succeeded but {lib_path} not found!"
+                    "Native library build succeeded but libhpcs_core not found!"
                 )
 
             print("\n" + "="*80)

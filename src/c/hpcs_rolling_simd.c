@@ -26,6 +26,7 @@
 #include <math.h>
 #include <omp.h>
 #include "hpcs_prefetch.h"
+#include "hpcs_core.h"
 
 // SIMD dispatch
 typedef enum {
@@ -530,7 +531,7 @@ static double quickselect_median(double *arr, int n) {
 }
 
 /**
- * Rolling robust z-score - uses median and MAD
+ * Rolling robust z-score - SAFE mode (with NaN checks)
  *
  * Computes 0.6745 * (x[i] - rolling_median) / rolling_MAD
  * More resistant to outliers than standard z-score.
@@ -540,7 +541,7 @@ static double quickselect_median(double *arr, int n) {
  * @param window - Window size
  * @param result - Output array [n]
  */
-void rolling_robust_zscore_openmp_simd(const double *x, int n, int window, double *result) {
+static void rolling_robust_zscore_safe(const double *x, int n, int window, double *result) {
     if (n < window || window <= 0) {
         return;
     }
@@ -567,7 +568,78 @@ void rolling_robust_zscore_openmp_simd(const double *x, int n, int window, doubl
     for (int i = 0; i < n_windows; i++) {
         int idx = i + window - 1;
 
-        // Copy window data
+        // Copy window data and check for NaN (SAFE mode)
+        int has_nan = 0;
+        for (int j = 0; j < window; j++) {
+            double val = x[i + j];
+            window_buf[j] = val;
+            if (isnan(val)) {
+                has_nan = 1;
+            }
+        }
+
+        if (has_nan) {
+            result[idx] = NAN;
+            continue;
+        }
+
+        // Compute median
+        double median = quickselect_median(window_buf, window);
+
+        // Compute absolute deviations from median
+        for (int j = 0; j < window; j++) {
+            window_buf[j] = x[i + j];  // Restore original values
+            deviations[j] = fabs(x[i + j] - median);
+        }
+
+        // Compute MAD (median of absolute deviations)
+        double mad = quickselect_median(deviations, window);
+
+        // Compute robust z-score for current value
+        if (mad > 1e-10) {
+            result[idx] = MAD_SCALE * (x[idx] - median) / mad;
+        } else {
+            result[idx] = 0.0;
+        }
+    }
+
+    free(window_buf);
+    free(deviations);
+}
+
+/**
+ * Rolling robust z-score - FAST mode (no NaN checks)
+ *
+ * Skips NaN validation for maximum performance.
+ */
+static void rolling_robust_zscore_fast(const double *x, int n, int window, double *result) {
+    if (n < window || window <= 0) {
+        return;
+    }
+
+    int n_windows = n - window + 1;
+    const double MAD_SCALE = 0.6745;
+
+    // Allocate workspace for window values and deviations
+    double *window_buf = (double *)malloc(window * sizeof(double));
+    double *deviations = (double *)malloc(window * sizeof(double));
+
+    if (!window_buf || !deviations) {
+        free(window_buf);
+        free(deviations);
+        return;
+    }
+
+    // Fill initial positions with NaN
+    for (int i = 0; i < window - 1; i++) {
+        result[i] = NAN;
+    }
+
+    // Process each window (no NaN checks in FAST mode)
+    for (int i = 0; i < n_windows; i++) {
+        int idx = i + window - 1;
+
+        // Copy window data (no NaN check)
         for (int j = 0; j < window; j++) {
             window_buf[j] = x[i + j];
         }
@@ -597,6 +669,85 @@ void rolling_robust_zscore_openmp_simd(const double *x, int n, int window, doubl
 }
 
 /**
+ * Rolling robust z-score - DETERMINISTIC mode (NaN checks, bit-exact)
+ *
+ * Provides reproducible results with full validation.
+ */
+static void rolling_robust_zscore_deterministic(const double *x, int n, int window, double *result) {
+    if (n < window || window <= 0) {
+        return;
+    }
+
+    int n_windows = n - window + 1;
+    const double MAD_SCALE = 0.6745;
+
+    // Allocate workspace for window values and deviations
+    double *window_buf = (double *)malloc(window * sizeof(double));
+    double *deviations = (double *)malloc(window * sizeof(double));
+
+    if (!window_buf || !deviations) {
+        free(window_buf);
+        free(deviations);
+        return;
+    }
+
+    // Fill initial positions with NaN
+    for (int i = 0; i < window - 1; i++) {
+        result[i] = NAN;
+    }
+
+    // Process each window (DETERMINISTIC - no parallelism, NaN checks)
+    for (int i = 0; i < n_windows; i++) {
+        int idx = i + window - 1;
+
+        // Copy window data and check for NaN
+        int has_nan = 0;
+        for (int j = 0; j < window; j++) {
+            double val = x[i + j];
+            window_buf[j] = val;
+            if (isnan(val)) {
+                has_nan = 1;
+            }
+        }
+
+        if (has_nan) {
+            result[idx] = NAN;
+            continue;
+        }
+
+        // Compute median
+        double median = quickselect_median(window_buf, window);
+
+        // Compute absolute deviations from median
+        for (int j = 0; j < window; j++) {
+            window_buf[j] = x[i + j];  // Restore original values
+            deviations[j] = fabs(x[i + j] - median);
+        }
+
+        // Compute MAD (median of absolute deviations)
+        double mad = quickselect_median(deviations, window);
+
+        // Compute robust z-score for current value
+        if (mad > 1e-10) {
+            result[idx] = MAD_SCALE * (x[idx] - median) / mad;
+        } else {
+            result[idx] = 0.0;
+        }
+    }
+
+    free(window_buf);
+    free(deviations);
+}
+
+/**
+ * Rolling robust z-score - OpenMP SIMD (legacy name kept for internal use)
+ * Now redirects to SAFE mode for backward compatibility.
+ */
+void rolling_robust_zscore_openmp_simd(const double *x, int n, int window, double *result) {
+    rolling_robust_zscore_safe(x, n, window, result);
+}
+
+/**
  * Rolling robust z-score with auto-tuning
  */
 void hpcs_rolling_robust_zscore_auto(const double *x, int n, int window,
@@ -608,29 +759,219 @@ void hpcs_rolling_robust_zscore_auto(const double *x, int n, int window,
 // Public API Wrappers (with status codes)
 // ============================================================================
 
+// ============================================================================
+// Rolling Z-Score - Mode-Specific Implementations
+// ============================================================================
+
 /**
- * Public API: Rolling z-score
+ * SAFE mode: Full validation with NaN checking
  */
-void hpcs_rolling_zscore(const double *x, int n, int window, double *y, int *status) {
+static void rolling_zscore_safe(const double *x, int n, int window, double *result) {
+    if (n < window || window <= 0) {
+        return;
+    }
+
+    int n_windows = n - window + 1;
+    double window_size_inv = 1.0 / (double)window;
+
+    // Fill initial positions with NaN
+    for (int i = 0; i < window - 1; i++) {
+        result[i] = NAN;
+    }
+
+    // Process each window position
+    for (int w = 0; w < n_windows; w++) {
+        int idx = w + window - 1;
+        double window_sum = 0.0;
+        double window_sq_sum = 0.0;
+        int valid_count = 0;
+
+        // Sum valid (non-NaN) elements in window
+        for (int j = w; j < w + window; j++) {
+            if (x[j] == x[j]) {  // NaN check
+                window_sum += x[j];
+                window_sq_sum += x[j] * x[j];
+                valid_count++;
+            }
+        }
+
+        // Compute z-score if we have valid data
+        if (valid_count > 0 && x[idx] == x[idx]) {
+            double count_inv = 1.0 / (double)valid_count;
+            double mean = window_sum * count_inv;
+            double variance = (window_sq_sum * count_inv) - (mean * mean);
+            double std = sqrt(variance > 0.0 ? variance : 0.0);
+            result[idx] = (std > 1e-10) ? (x[idx] - mean) / std : NAN;
+        } else {
+            result[idx] = NAN;
+        }
+    }
+}
+
+/**
+ * FAST mode: No validation, maximum speed (SIMD optimized)
+ */
+static void rolling_zscore_fast(const double *x, int n, int window, double *result) {
+    if (n < window || window <= 0) {
+        return;
+    }
+
+    int n_windows = n - window + 1;
+    double window_size = (double)window;
+    double window_size_inv = 1.0 / window_size;
+
+    // Compute initial window mean and variance
+    double window_sum = 0.0;
+    double window_sq_sum = 0.0;
+
+    #pragma omp simd reduction(+:window_sum, window_sq_sum)
+    for (int i = 0; i < window; i++) {
+        double val = x[i];
+        window_sum += val;
+        window_sq_sum += val * val;
+    }
+
+    double mean = window_sum * window_size_inv;
+    double variance = (window_sq_sum * window_size_inv) - (mean * mean);
+    double std = sqrt(variance > 0.0 ? variance : 0.0);
+
+    // Fill initial window positions with NaN
+    for (int i = 0; i < window - 1; i++) {
+        result[i] = NAN;
+    }
+
+    // First valid z-score
+    result[window - 1] = (std > 1e-10) ? (x[window - 1] - mean) / std : NAN;
+
+    // Slide window and compute z-scores
+    for (int i = 1; i < n_windows; i++) {
+        int idx = i + window - 1;
+        double old_val = x[i - 1];
+        double new_val = x[idx];
+
+        // Update window sum and squared sum
+        window_sum = window_sum - old_val + new_val;
+        window_sq_sum = window_sq_sum - (old_val * old_val) + (new_val * new_val);
+
+        // Compute mean and std
+        mean = window_sum * window_size_inv;
+        variance = (window_sq_sum * window_size_inv) - (mean * mean);
+        std = sqrt(variance > 0.0 ? variance : 0.0);
+
+        // Compute z-score for current value
+        result[idx] = (std > 1e-10) ? (x[idx] - mean) / std : NAN;
+    }
+}
+
+/**
+ * DETERMINISTIC mode: No SIMD, bit-exact reproducibility
+ */
+static void rolling_zscore_deterministic(const double *x, int n, int window, double *result) {
+    if (n < window || window <= 0) {
+        return;
+    }
+
+    int n_windows = n - window + 1;
+    double window_size_inv = 1.0 / (double)window;
+
+    // Fill initial positions with NaN
+    for (int i = 0; i < window - 1; i++) {
+        result[i] = NAN;
+    }
+
+    // Process each window position (no SIMD pragmas)
+    for (int w = 0; w < n_windows; w++) {
+        int idx = w + window - 1;
+        double window_sum = 0.0;
+        double window_sq_sum = 0.0;
+
+        // Sum elements in window
+        for (int j = w; j < w + window; j++) {
+            window_sum += x[j];
+            window_sq_sum += x[j] * x[j];
+        }
+
+        // Compute z-score
+        double mean = window_sum * window_size_inv;
+        double variance = (window_sq_sum * window_size_inv) - (mean * mean);
+        double std = sqrt(variance > 0.0 ? variance : 0.0);
+        result[idx] = (std > 1e-10) ? (x[idx] - mean) / std : NAN;
+    }
+}
+
+/**
+ * Public API: Rolling z-score (v0.8.0 with execution mode support)
+ */
+void hpcs_rolling_zscore(const double *x, int n, int window, double *y, int mode, int *status) {
     if (n <= 0 || window <= 0 || !x || !y) {
         *status = 1;  // HPCS_ERR_INVALID_ARGS
         return;
     }
 
-    rolling_zscore_openmp_simd(x, n, window, y);
+    // Resolve mode
+    int effective_mode = mode;
+    if (mode == HPCS_MODE_USE_GLOBAL) {
+        int get_status;
+        hpcs_get_execution_mode(&effective_mode, &get_status);
+        if (get_status != 0) {
+            effective_mode = HPCS_MODE_SAFE;  // Fallback to SAFE
+        }
+    }
+
+    // Dispatch to appropriate implementation
+    switch (effective_mode) {
+        case HPCS_MODE_SAFE:
+            rolling_zscore_safe(x, n, window, y);
+            break;
+        case HPCS_MODE_FAST:
+            rolling_zscore_fast(x, n, window, y);
+            break;
+        case HPCS_MODE_DETERMINISTIC:
+            rolling_zscore_deterministic(x, n, window, y);
+            break;
+        default:
+            *status = 1;  // HPCS_ERR_INVALID_ARGS
+            return;
+    }
+
     *status = 0;  // HPCS_SUCCESS
 }
 
 /**
- * Public API: Rolling robust z-score
+ * Public API: Rolling robust z-score (with execution mode support)
  */
-void hpcs_rolling_robust_zscore(const double *x, int n, int window, double *y, int *status) {
+void hpcs_rolling_robust_zscore(const double *x, int n, int window, double *y, int mode, int *status) {
     if (n <= 0 || window <= 0 || !x || !y) {
         *status = 1;  // HPCS_ERR_INVALID_ARGS
         return;
     }
 
-    rolling_robust_zscore_openmp_simd(x, n, window, y);
+    // Resolve mode
+    int effective_mode = mode;
+    if (mode == HPCS_MODE_USE_GLOBAL) {
+        int get_status;
+        hpcs_get_execution_mode(&effective_mode, &get_status);
+        if (get_status != 0) {
+            effective_mode = HPCS_MODE_SAFE;  // Fallback to SAFE
+        }
+    }
+
+    // Dispatch to appropriate implementation
+    switch (effective_mode) {
+        case HPCS_MODE_SAFE:
+            rolling_robust_zscore_safe(x, n, window, y);
+            break;
+        case HPCS_MODE_FAST:
+            rolling_robust_zscore_fast(x, n, window, y);
+            break;
+        case HPCS_MODE_DETERMINISTIC:
+            rolling_robust_zscore_deterministic(x, n, window, y);
+            break;
+        default:
+            *status = 1;  // HPCS_ERR_INVALID_ARGS
+            return;
+    }
+
     *status = 0;  // HPCS_SUCCESS
 }
 

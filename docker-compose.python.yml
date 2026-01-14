@@ -16,6 +16,7 @@ services:
       - "8888:8888"
     environment:
       - PYTHONPATH=/workspace/python
+      - LD_LIBRARY_PATH=/workspace/build
       - OMP_NUM_THREADS=2
 
   hpcs-jupyter:
@@ -33,6 +34,7 @@ services:
       - "8888:8888"
     environment:
       - PYTHONPATH=/workspace/python
+      - LD_LIBRARY_PATH=/workspace/build
       - OMP_NUM_THREADS=2
 
 volumes:

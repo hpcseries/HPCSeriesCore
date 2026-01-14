@@ -184,10 +184,10 @@ contains
         buf(col) = x(idx)
       end do
       ! Compute median
-      call hpcs_median(buf, m_eff, med, st)
+      call hpcs_median(buf, m_eff, med, HPCS_MODE_SAFE, st)
       if (st > max_status) max_status = st
       ! Compute MAD
-      call hpcs_mad(buf, m_eff, mad_val, st)
+      call hpcs_mad(buf, m_eff, mad_val, HPCS_MODE_SAFE, st)
       if (st == HPCS_ERR_NUMERIC_FAIL) then
         ! degeneracy: fill mask with zeros
         do col = 1_c_int, m_eff
