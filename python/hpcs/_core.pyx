@@ -99,7 +99,7 @@ cdef extern from "hpcs_core.h":
     void hpcs_reduce_max_simd(const double *x, int n, double *out, int *status)
     void hpcs_reduce_std_simd(const double *x, int n, double *out, int *status)
 
-    # Robust statistics
+    # Robust statistics (v0.8.0 - with execution mode support)
     void hpcs_median(const double *x, int n, double *out, int mode, int *status)
     void hpcs_mad(const double *x, int n, double *out, int mode, int *status)
     void hpcs_quantile(const double *x, int n, double q, double *out, int mode, int *status)
@@ -114,7 +114,7 @@ cdef extern from "hpcs_core.h":
     void hpcs_detect_anomalies(const double *x, int n, double threshold, int *anomaly, int *status)
     void hpcs_detect_anomalies_robust(const double *x, int n, double threshold, int *anomaly, int *status)
 
-    # Rolling operations
+    # Rolling operations (v0.8.0 with execution mode support)
     void hpcs_rolling_sum(const double *x, int n, int window, double *y, int mode, int *status)
     void hpcs_rolling_mean(const double *x, int n, int window, double *y, int mode, int *status)
     void hpcs_rolling_std(const double *x, int n, int window, double *y, int mode, int *status)
@@ -124,7 +124,7 @@ cdef extern from "hpcs_core.h":
     void hpcs_rolling_zscore(const double *x, int n, int window, double *y, int mode, int *status)
     void hpcs_rolling_robust_zscore(const double *x, int n, int window, double *y, int mode, int *status)
 
-    # Batched/Axis operations
+    # Batched/Axis operations (v0.8.0 with execution mode support)
     void hpcs_reduce_sum_axis1(const double *x, int n, int m, double *out, int mode, int *status)
     void hpcs_reduce_mean_axis1(const double *x, int n, int m, double *out, int mode, int *status)
     void hpcs_median_axis1(const double *x, int n, int m, double *out, int mode, int *status)
@@ -132,7 +132,7 @@ cdef extern from "hpcs_core.h":
     void hpcs_reduce_min_axis0_simd(const double *x, int n, int m, double *out, int *status)
     void hpcs_reduce_max_axis0_simd(const double *x, int n, int m, double *out, int *status)
 
-    # Masked operations
+    # Masked operations (v0.8.0 with execution mode support)
     void hpcs_reduce_sum_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
     void hpcs_reduce_mean_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
     void hpcs_reduce_variance_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
@@ -616,7 +616,7 @@ def group_var(x, group_ids, n_groups, mode=None):
 
 def median(x, mode=None):
     """
-    Median of array elements.
+    Median of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -652,7 +652,7 @@ def median(x, mode=None):
 
 def mad(x, mode=None):
     """
-    Median Absolute Deviation (MAD) - robust scale estimator.
+    Median Absolute Deviation (MAD) - robust scale estimator (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -688,7 +688,7 @@ def mad(x, mode=None):
 
 def quantile(x, double q, mode=None):
     """
-    Compute q-th quantile (0 <= q <= 1).
+    Compute q-th quantile (0 <= q <= 1) (v0.8.0 with execution mode support).
 
     Uses Type 7 interpolation (linear between order statistics).
 
@@ -934,7 +934,7 @@ def detect_anomalies_robust(x, double threshold=3.0):
 
 def rolling_sum(x, int window, mode=None):
     """
-    Rolling sum with specified window size.
+    Rolling sum with specified window size (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -970,7 +970,7 @@ def rolling_sum(x, int window, mode=None):
 
 def rolling_mean(x, int window, mode=None):
     """
-    Rolling mean with specified window size.
+    Rolling mean with specified window size (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -1132,7 +1132,7 @@ def rolling_mad(x, int window, mode=None):
 
 def axis_sum(x, int axis=1, mode=None):
     """
-    Sum along specified axis of 2D array.
+    Sum along specified axis of 2D array (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -1292,7 +1292,7 @@ def axis_mad(x, int axis=1, mode=None):
 
 def sum_masked(x, mask, mode=None):
     """
-    Sum of array elements where mask is True/non-zero.
+    Sum of array elements where mask is True/non-zero (v0.8.0 with execution mode support).
 
     Parameters
     ----------
