@@ -8,12 +8,14 @@ module hpcs_constants
   implicit none
   public
 
-  ! Error status codes (C-compatible)
+  ! Error status codes
   integer(c_int), parameter :: HPCS_SUCCESS          = 0_c_int
   integer(c_int), parameter :: HPCS_ERR_INVALID_ARGS = 1_c_int
   integer(c_int), parameter :: HPCS_ERR_NUMERIC_FAIL = 2_c_int
+  integer(c_int), parameter :: HPCS_ERR_OUT_OF_MEMORY = 3_c_int
+  integer(c_int), parameter :: HPCS_ERR_INTERNAL      = 4_c_int
 
-  ! Execution mode constants (v0.8.0 - Safe vs Fast vs Deterministic)
+  ! Execution mode constants
   integer(c_int), parameter :: HPCS_MODE_SAFE          = 0_c_int
   integer(c_int), parameter :: HPCS_MODE_FAST          = 1_c_int
   integer(c_int), parameter :: HPCS_MODE_DETERMINISTIC = 2_c_int

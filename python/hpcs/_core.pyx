@@ -5,7 +5,7 @@
 # cython: initializedcheck=False
 
 """
-HPCSeries Core v0.7 - Core Reductions & Rolling Operations
+HPCSeries Core - Core Reductions & Rolling Operations
 ===========================================================
 
 Cython bindings to C/Fortran HPC kernels with zero-copy NumPy integration.
@@ -32,15 +32,81 @@ cdef extern from "hpcs_core.h":
     # Status codes
     int HPCS_SUCCESS
     int HPCS_ERR_INVALID_ARGS
+    int HPCS_ERR_NUMERIC_FAIL
+    int HPCS_ERR_OUT_OF_MEMORY
+    int HPCS_ERR_INTERNAL
 
-    # Reduction functions (Fortran interface)
-    void hpcs_reduce_sum(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_mean(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_variance(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_min(const double *x, int n, double *out, int *status)
-    void hpcs_reduce_max(const double *x, int n, double *out, int *status)
+    # Feature discovery
+    unsigned long long get_build_features()
+    const char* get_last_error()
+    void clear_last_error()
 
-    # SIMD-accelerated reductions (v0.6)
+    # Feature bitmask constants
+    unsigned long long HPCS_FEAT_OPENMP
+    unsigned long long HPCS_FEAT_SIMD_AVX2
+    unsigned long long HPCS_FEAT_SIMD_AVX512
+    unsigned long long HPCS_FEAT_SIMD_NEON
+    unsigned long long HPCS_FEAT_FAST_MATH
+    unsigned long long HPCS_FEAT_GPU_OFFLOAD
+    unsigned long long HPCS_FEAT_CALIBRATED
+
+    # Workspace API
+    ctypedef struct workspace_t:
+        pass
+    void workspace_create(size_t bytes, workspace_t **ws, int *status)
+    void workspace_free(workspace_t *ws)
+    size_t workspace_size(const workspace_t *ws)
+    void workspace_reserve(workspace_t *ws, size_t bytes, int *status)
+
+    # Pipeline API
+    ctypedef struct pipeline_t:
+        pass
+    pipeline_t* pipeline_create(workspace_t *ws, int *status)
+    void pipeline_free(pipeline_t *plan)
+    int pipeline_add_diff(pipeline_t *plan, int order, int *status)
+    int pipeline_add_ewma(pipeline_t *plan, double alpha, int *status)
+    int pipeline_add_ewvar(pipeline_t *plan, double alpha, int *status)
+    int pipeline_add_ewstd(pipeline_t *plan, double alpha, int *status)
+    int pipeline_add_rolling_mean(pipeline_t *plan, int window, int *status)
+    int pipeline_add_rolling_std(pipeline_t *plan, int window, int *status)
+    int pipeline_add_rolling_median(pipeline_t *plan, int window, int *status)
+    int pipeline_add_rolling_mad(pipeline_t *plan, int window, int *status)
+    int pipeline_add_zscore(pipeline_t *plan, int *status)
+    int pipeline_add_robust_zscore(pipeline_t *plan, double eps, int *status)
+    int pipeline_add_normalize_minmax(pipeline_t *plan, int *status)
+    int pipeline_add_clip(pipeline_t *plan, double min_val, double max_val, int *status)
+
+    # New pipeline stages (v0.8.0)
+    int pipeline_add_cumulative_min(pipeline_t *plan, int *status)
+    int pipeline_add_cumulative_max(pipeline_t *plan, int *status)
+    int pipeline_add_fill_forward(pipeline_t *plan, int *status)
+    int pipeline_add_prefix_sum(pipeline_t *plan, int *status)
+    int pipeline_add_convolve(pipeline_t *plan, const double *kernel, int m, int *status)
+    int pipeline_add_lag(pipeline_t *plan, int k, int *status)
+    int pipeline_add_log_return(pipeline_t *plan, int *status)
+    int pipeline_add_pct_change(pipeline_t *plan, int *status)
+    int pipeline_add_scale(pipeline_t *plan, double factor, int *status)
+    int pipeline_add_shift(pipeline_t *plan, double offset, int *status)
+    int pipeline_add_abs(pipeline_t *plan, int *status)
+    int pipeline_add_sqrt(pipeline_t *plan, int *status)
+
+    void pipeline_execute(const pipeline_t *plan, const double *x, size_t n, double *out, size_t *out_n, int *status)
+    const char* pipeline_summary(const pipeline_t *plan)
+
+    # Reduction functions
+    void hpcs_reduce_sum(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_mean(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_variance(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_std(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_min(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_reduce_max(const double *x, int n, double *out, int mode, int *status)
+
+    # Grouped reductions
+    void hpcs_group_reduce_sum(const double *x, int n, const int *group_ids, int n_groups, double *y, int mode, int *status)
+    void hpcs_group_reduce_mean(const double *x, int n, const int *group_ids, int n_groups, double *y, int mode, int *status)
+    void hpcs_group_reduce_variance(const double *x, int n, const int *group_ids, int n_groups, double *y, int mode, int *status)
+
+    # SIMD-accelerated reductions
     void hpcs_reduce_sum_simd(const double *x, int n, double *out, int *status)
     void hpcs_reduce_mean_simd(const double *x, int n, double *out, int *status)
     void hpcs_reduce_variance_simd(const double *x, int n, double *out, int *status)
@@ -48,10 +114,10 @@ cdef extern from "hpcs_core.h":
     void hpcs_reduce_max_simd(const double *x, int n, double *out, int *status)
     void hpcs_reduce_std_simd(const double *x, int n, double *out, int *status)
 
-    # Robust statistics (v0.3)
-    void hpcs_median(const double *x, int n, double *out, int *status)
-    void hpcs_mad(const double *x, int n, double *out, int *status)
-    void hpcs_quantile(const double *x, int n, double q, double *out, int *status)
+    # Robust statistics (v0.8.0 - with execution mode support)
+    void hpcs_median(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_mad(const double *x, int n, double *out, int mode, int *status)
+    void hpcs_quantile(const double *x, int n, double q, double *out, int mode, int *status)
 
     # Transform operations
     void hpcs_zscore(const double *x, int n, double *y, int *status)
@@ -63,38 +129,38 @@ cdef extern from "hpcs_core.h":
     void hpcs_detect_anomalies(const double *x, int n, double threshold, int *anomaly, int *status)
     void hpcs_detect_anomalies_robust(const double *x, int n, double threshold, int *anomaly, int *status)
 
-    # Rolling operations (v0.3)
-    void hpcs_rolling_sum(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_mean(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_std(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_variance(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_median(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_mad(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_zscore(const double *x, int n, int window, double *y, int *status)
-    void hpcs_rolling_robust_zscore(const double *x, int n, int window, double *y, int *status)
+    # Rolling operations (v0.8.0 with execution mode support)
+    void hpcs_rolling_sum(const double *x, int n, int window, double *y, int mode, int *status)
+    void hpcs_rolling_mean(const double *x, int n, int window, double *y, int mode, int *status)
+    void hpcs_rolling_std(const double *x, int n, int window, double *y, int mode, int *status)
+    void hpcs_rolling_variance(const double *x, int n, int window, double *y, int mode, int *status)
+    void hpcs_rolling_median(const double *x, int n, int window, double *y, int mode, int *status)
+    void hpcs_rolling_mad(const double *x, int n, int window, double *y, int mode, int *status)
+    void hpcs_rolling_zscore(const double *x, int n, int window, double *y, int mode, int *status)
+    void hpcs_rolling_robust_zscore(const double *x, int n, int window, double *y, int mode, int *status)
 
-    # Batched/Axis operations (v0.4)
-    void hpcs_reduce_sum_axis1(const double *x, int n, int m, double *out, int *status)
-    void hpcs_reduce_mean_axis1(const double *x, int n, int m, double *out, int *status)
-    void hpcs_median_axis1(const double *x, int n, int m, double *out, int *status)
-    void hpcs_mad_axis1(const double *x, int n, int m, double *out, int *status)
+    # Batched/Axis operations (v0.8.0 with execution mode support)
+    void hpcs_reduce_sum_axis1(const double *x, int n, int m, double *out, int mode, int *status)
+    void hpcs_reduce_mean_axis1(const double *x, int n, int m, double *out, int mode, int *status)
+    void hpcs_median_axis1(const double *x, int n, int m, double *out, int mode, int *status)
+    void hpcs_mad_axis1(const double *x, int n, int m, double *out, int mode, int *status)
     void hpcs_reduce_min_axis0_simd(const double *x, int n, int m, double *out, int *status)
     void hpcs_reduce_max_axis0_simd(const double *x, int n, int m, double *out, int *status)
 
-    # Masked operations (v0.4)
-    void hpcs_reduce_sum_masked(const double *x, const int *mask, int n, double *out, int *status)
-    void hpcs_reduce_mean_masked(const double *x, const int *mask, int n, double *out, int *status)
-    void hpcs_reduce_variance_masked(const double *x, const int *mask, int n, double *out, int *status)
-    void hpcs_median_masked(const double *x, const int *mask, int n, double *out, int *status)
-    void hpcs_mad_masked(const double *x, const int *mask, int n, double *out, int *status)
+    # Masked operations (v0.8.0 with execution mode support)
+    void hpcs_reduce_sum_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
+    void hpcs_reduce_mean_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
+    void hpcs_reduce_variance_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
+    void hpcs_median_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
+    void hpcs_mad_masked(const double *x, const int *mask, int n, double *out, int mode, int *status)
 
-    # Calibration functions (v0.5)
+    # Calibration functions
     void hpcs_calibrate(int *status)
     void hpcs_calibrate_quick(int *status)
     void hpcs_save_config(const char *path, int *status)
     void hpcs_load_config(const char *path, int *status)
 
-    # v0.8.0 Transform & Robust Statistics
+    # Transform & Robust Statistics
     # Exponential weighted statistics
     void hpcs_ewma(const double *x, int n, double alpha, double *y, int mode, int *status)
     void hpcs_ewvar(const double *x, int n, double alpha, double *v_out, int mode, int *status)
@@ -112,7 +178,7 @@ cdef extern from "hpcs_core.h":
     void hpcs_trimmed_mean(const double *x, int n, double trim_frac, double *result, int mode, int *status)
     void hpcs_winsorized_mean(const double *x, int n, double win_frac, double *result, int mode, int *status)
 
-    # Execution mode API (v0.8.0)
+    # Execution mode API
     int HPCS_MODE_SAFE
     int HPCS_MODE_FAST
     int HPCS_MODE_DETERMINISTIC
@@ -138,11 +204,24 @@ cdef inline cnp.ndarray[cnp.float64_t, ndim=1] ensure_c_contiguous(object x):
 
 cdef inline void check_status(int status, str func_name):
     """Check HPCS status code and raise exception if error."""
+    cdef const char* err_msg
+    cdef str detail
+
     if status != HPCS_SUCCESS:
+        # Get detailed error message from thread-local buffer
+        err_msg = get_last_error()
+        detail = err_msg.decode('utf-8') if err_msg and err_msg[0] != 0 else ""
+
         if status == HPCS_ERR_INVALID_ARGS:
-            raise ValueError(f"{func_name}: Invalid arguments")
+            raise ValueError(f"{func_name}: Invalid arguments" + (f" ({detail})" if detail else ""))
+        elif status == HPCS_ERR_NUMERIC_FAIL:
+            raise RuntimeError(f"{func_name}: Numeric failure" + (f" ({detail})" if detail else ""))
+        elif status == HPCS_ERR_OUT_OF_MEMORY:
+            raise MemoryError(f"{func_name}: Out of memory" + (f" ({detail})" if detail else ""))
+        elif status == HPCS_ERR_INTERNAL:
+            raise RuntimeError(f"{func_name}: Internal error" + (f" ({detail})" if detail else ""))
         else:
-            raise RuntimeError(f"{func_name}: Error code {status}")
+            raise RuntimeError(f"{func_name}: Error code {status}" + (f" ({detail})" if detail else ""))
 
 # ==============================================================================
 # Module Initialization
@@ -154,7 +233,7 @@ hpcs_rolling_simd_init()
 hpcs_zscore_simd_init()
 
 # ==============================================================================
-# Execution Mode API (v0.8.0)
+# Execution Mode API
 # ==============================================================================
 
 # Python-friendly mode names
@@ -256,14 +335,17 @@ cdef inline int _parse_mode(object mode) except -999:
 # Python API - Reductions
 # ==============================================================================
 
-def sum(x):
+def sum(x, mode=None):
     """
-    Sum of array elements (SIMD-accelerated).
+    Sum of array elements
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -275,25 +357,31 @@ def sum(x):
     >>> import hpcs
     >>> hpcs.sum([1, 2, 3, 4, 5])
     15.0
+    >>> hpcs.sum([1, 2, 3, 4, 5], mode='fast')
+    15.0
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_sum_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_sum(&arr[0], n, &result, c_mode, &status)
     check_status(status, "sum")
 
     return result
 
-def mean(x):
+def mean(x, mode=None):
     """
-    Mean of array elements (SIMD-accelerated).
+    Mean of array elements.
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -310,80 +398,92 @@ def mean(x):
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_mean_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_mean(&arr[0], n, &result, c_mode, &status)
     check_status(status, "mean")
 
     return result
 
-def var(x):
+def var(x, mode=None):
     """
-    Variance of array elements (SIMD-accelerated).
+    Variance of array elements.
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
     result : float
-        Sample variance
+        Population variance
 
     Examples
     --------
     >>> import hpcs
     >>> hpcs.var([1, 2, 3, 4, 5])
-    2.5
+    2.0
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_variance_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_variance(&arr[0], n, &result, c_mode, &status)
     check_status(status, "var")
 
     return result
 
-def std(x):
+def std(x, mode=None):
     """
-    Standard deviation of array elements (SIMD-accelerated).
+    Standard deviation of array elements.
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
     result : float
-        Sample standard deviation
+        Population standard deviation
 
     Examples
     --------
     >>> import hpcs
     >>> hpcs.std([1, 2, 3, 4, 5])
-    1.5811388300841898
+    1.4142135623730951
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_std_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_std(&arr[0], n, &result, c_mode, &status)
     check_status(status, "std")
 
     return result
 
-def min(x):
+def min(x, mode=None):
     """
-    Minimum of array elements (SIMD-accelerated).
+    Minimum of array elements.
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -394,20 +494,24 @@ def min(x):
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_min_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_min(&arr[0], n, &result, c_mode, &status)
     check_status(status, "min")
 
     return result
 
-def max(x):
+def max(x, mode=None):
     """
-    Maximum of array elements (SIMD-accelerated).
+    Maximum of array elements.
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -418,24 +522,124 @@ def max(x):
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_max_simd(&arr[0], n, &result, &status)
+    hpcs_reduce_max(&arr[0], n, &result, c_mode, &status)
     check_status(status, "max")
 
+    return result
+
+def group_sum(x, group_ids, n_groups, mode=None):
+    """
+    Grouped sum.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    group_ids : array_like (int)
+        Group IDs (0-indexed, values in [0, n_groups-1])
+    n_groups : int
+        Number of groups
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Sum for each group (length n_groups)
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] gids = np.ascontiguousarray(group_ids, dtype=np.int32)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n_groups, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_group_reduce_sum(&arr[0], n, <int*>&gids[0], n_groups, &result[0], c_mode, &status)
+    check_status(status, "group_sum")
+    return result
+
+def group_mean(x, group_ids, n_groups, mode=None):
+    """
+    Grouped mean.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    group_ids : array_like (int)
+        Group IDs (0-indexed, values in [0, n_groups-1])
+    n_groups : int
+        Number of groups
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Mean for each group (length n_groups). Empty groups return NaN.
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] gids = np.ascontiguousarray(group_ids, dtype=np.int32)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n_groups, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_group_reduce_mean(&arr[0], n, <int*>&gids[0], n_groups, &result[0], c_mode, &status)
+    check_status(status, "group_mean")
+    return result
+
+def group_var(x, group_ids, n_groups, mode=None):
+    """
+    Grouped variance.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    group_ids : array_like (int)
+        Group IDs (0-indexed, values in [0, n_groups-1])
+    n_groups : int
+        Number of groups
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Population variance for each group (length n_groups). Empty groups return NaN.
+    """
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] gids = np.ascontiguousarray(group_ids, dtype=np.int32)
+    cdef int n = arr.shape[0]
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n_groups, dtype=np.float64)
+    cdef int status
+    cdef int c_mode = _parse_mode(mode)
+
+    hpcs_group_reduce_variance(&arr[0], n, <int*>&gids[0], n_groups, &result[0], c_mode, &status)
+    check_status(status, "group_var")
     return result
 
 # ==============================================================================
 # Python API - Robust Statistics
 # ==============================================================================
 
-def median(x):
+def median(x, mode=None):
     """
-    Median of array elements.
+    Median of array elements (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -447,25 +651,31 @@ def median(x):
     >>> import hpcs
     >>> hpcs.median([1, 2, 3, 4, 5])
     3.0
+    >>> hpcs.median([1, 2, 3, 4, 5], mode='fast')
+    3.0
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_median(&arr[0], n, &result, &status)
+    hpcs_median(&arr[0], n, &result, c_mode, &status)
     check_status(status, "median")
 
     return result
 
-def mad(x):
+def mad(x, mode=None):
     """
-    Median Absolute Deviation (MAD) - robust scale estimator.
+    Median Absolute Deviation (MAD) - robust scale estimator (v0.8.0 with execution mode support).
 
     Parameters
     ----------
     x : array_like
         Input array
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -477,20 +687,23 @@ def mad(x):
     >>> import hpcs
     >>> hpcs.mad([1, 2, 3, 4, 5])
     1.4826
+    >>> hpcs.mad([1, 2, 3, 4, 5], mode='fast')
+    1.4826
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_mad(&arr[0], n, &result, &status)
+    hpcs_mad(&arr[0], n, &result, c_mode, &status)
     check_status(status, "mad")
 
     return result
 
-def quantile(x, double q):
+def quantile(x, double q, mode=None):
     """
-    Compute q-th quantile (0 <= q <= 1).
+    Compute q-th quantile (0 <= q <= 1) (v0.8.0 with execution mode support).
 
     Uses Type 7 interpolation (linear between order statistics).
 
@@ -500,6 +713,9 @@ def quantile(x, double q):
         Input array
     q : float
         Quantile to compute (0.0 to 1.0)
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -513,13 +729,16 @@ def quantile(x, double q):
     3.0
     >>> hpcs.quantile([1, 2, 3, 4, 5], 0.25)  # 25th percentile
     2.0
+    >>> hpcs.quantile([1, 2, 3, 4, 5], 0.75, mode='fast')  # 75th percentile
+    4.0
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_quantile(&arr[0], n, q, &result, &status)
+    hpcs_quantile(&arr[0], n, q, &result, c_mode, &status)
     check_status(status, "quantile")
 
     return result
@@ -728,9 +947,9 @@ def detect_anomalies_robust(x, double threshold=3.0):
 # Python API - Rolling Operations
 # ==============================================================================
 
-def rolling_sum(x, int window):
+def rolling_sum(x, int window, mode=None):
     """
-    Rolling sum with specified window size.
+    Rolling sum with specified window size (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -738,6 +957,9 @@ def rolling_sum(x, int window):
         Input array
     window : int
         Window size
+    mode : str, optional
+        Execution mode: 'safe' (full validation), 'fast' (no validation),
+        'deterministic' (reproducible), or None (use global setting)
 
     Returns
     -------
@@ -748,21 +970,22 @@ def rolling_sum(x, int window):
     --------
     >>> import hpcs
     >>> hpcs.rolling_sum([1, 2, 3, 4, 5], window=3)
-    array([nan, nan, 6., 9., 12.])
+    array([1., 3., 6., 9., 12.])
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_sum(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_sum(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_sum")
 
     return result
 
-def rolling_mean(x, int window):
+def rolling_mean(x, int window, mode=None):
     """
-    Rolling mean with specified window size.
+    Rolling mean with specified window size (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -770,6 +993,9 @@ def rolling_mean(x, int window):
         Input array
     window : int
         Window size
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -781,61 +1007,136 @@ def rolling_mean(x, int window):
     >>> import hpcs
     >>> hpcs.rolling_mean([1, 2, 3, 4, 5], window=3)
     array([nan, nan, 2., 3., 4.])
+    >>> hpcs.rolling_mean([1, 2, 3, 4, 5], window=3, mode='fast')
+    array([nan, nan, 2., 3., 4.])
     """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_mean(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_mean(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_mean")
 
     return result
 
-def rolling_std(x, int window):
-    """Rolling standard deviation with specified window size."""
+def rolling_std(x, int window, mode=None):
+    """
+    Rolling standard deviation with specified window size.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    window : int
+        Window size
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Rolling standard deviations (same length as input)
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_std(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_std(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_std")
 
     return result
 
-def rolling_var(x, int window):
-    """Rolling variance with specified window size."""
+def rolling_var(x, int window, mode=None):
+    """
+    Rolling variance with specified window size.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    window : int
+        Window size
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Rolling variances (same length as input)
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_variance(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_variance(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_var")
 
     return result
 
-def rolling_median(x, int window):
-    """Rolling median with specified window size (fast C++ heap implementation)."""
+def rolling_median(x, int window, mode=None):
+    """
+    Rolling median with specified window size.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    window : int
+        Window size
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Rolling median values
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_median(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_median(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_median")
 
     return result
 
-def rolling_mad(x, int window):
-    """Rolling MAD with specified window size (fast C++ heap implementation)."""
+def rolling_mad(x, int window, mode=None):
+    """
+    Rolling MAD with specified window size.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    window : int
+        Window size
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray
+        Rolling MAD values
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_mad(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_mad(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_mad")
 
     return result
@@ -844,9 +1145,9 @@ def rolling_mad(x, int window):
 # Python API - 2D Axis Operations (Tier B)
 # ==============================================================================
 
-def axis_sum(x, int axis=1):
+def axis_sum(x, int axis=1, mode=None):
     """
-    Sum along specified axis of 2D array.
+    Sum along specified axis of 2D array (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -854,6 +1155,9 @@ def axis_sum(x, int axis=1):
         Input 2D array
     axis : int, optional
         Axis along which to sum (default: 1, reduces columns)
+    mode : str, optional
+        Execution mode: 'safe' (full validation), 'fast' (no validation),
+        'deterministic' (reproducible), or None (use global setting)
 
     Returns
     -------
@@ -873,61 +1177,124 @@ def axis_sum(x, int axis=1):
     cdef int m = arr.shape[1]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
     if axis == 1:
         result = np.empty(n, dtype=np.float64)
-        hpcs_reduce_sum_axis1(&arr[0,0], n, m, &result[0], &status)
+        hpcs_reduce_sum_axis1(&arr[0,0], n, m, &result[0], c_mode, &status)
     else:
         raise ValueError("Only axis=1 currently supported")
 
     check_status(status, "axis_sum")
     return result
 
-def axis_mean(x, int axis=1):
-    """Mean along specified axis of 2D array."""
+def axis_mean(x, int axis=1, mode=None):
+    """
+    Mean along specified axis of 2D array.
+
+    Parameters
+    ----------
+    x : array_like (2D)
+        Input 2D array
+    axis : int, optional
+        Axis along which to compute mean (default: 1, reduces columns)
+    mode : str, optional
+        Execution mode: 'safe' (full validation), 'fast' (no validation),
+        'deterministic' (reproducible), or None (use global setting)
+
+    Returns
+    -------
+    result : ndarray (1D)
+        Means along the specified axis
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> import numpy as np
+    >>> x = np.array([[1, 2, 3], [4, 5, 6]])
+    >>> hpcs.axis_mean(x, axis=1)  # Mean across columns for each row
+    array([2., 5.])
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=2] arr = np.asarray(x, dtype=np.float64, order='F')
     cdef int n = arr.shape[0]
     cdef int m = arr.shape[1]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
     if axis == 1:
         result = np.empty(n, dtype=np.float64)
-        hpcs_reduce_mean_axis1(&arr[0,0], n, m, &result[0], &status)
+        hpcs_reduce_mean_axis1(&arr[0,0], n, m, &result[0], c_mode, &status)
     else:
         raise ValueError("Only axis=1 currently supported")
 
     check_status(status, "axis_mean")
     return result
 
-def axis_median(x, int axis=1):
-    """Median along specified axis of 2D array."""
+def axis_median(x, int axis=1, mode=None):
+    """
+    Median along specified axis of 2D array.
+
+    Parameters
+    ----------
+    x : array_like, shape (n, m)
+        Input 2D array (column-major)
+    axis : int, optional
+        Axis along which to compute median (currently only axis=1 supported)
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray, shape (n,)
+        Median for each row
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=2] arr = np.asarray(x, dtype=np.float64, order='F')
     cdef int n = arr.shape[0]
     cdef int m = arr.shape[1]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
     if axis == 1:
         result = np.empty(n, dtype=np.float64)
-        hpcs_median_axis1(&arr[0,0], n, m, &result[0], &status)
+        hpcs_median_axis1(&arr[0,0], n, m, &result[0], c_mode, &status)
     else:
         raise ValueError("Only axis=1 currently supported")
 
     check_status(status, "axis_median")
     return result
 
-def axis_mad(x, int axis=1):
-    """MAD along specified axis of 2D array."""
+def axis_mad(x, int axis=1, mode=None):
+    """
+    MAD along specified axis of 2D array.
+
+    Parameters
+    ----------
+    x : array_like, shape (n, m)
+        Input 2D array (column-major)
+    axis : int, optional
+        Axis along which to compute MAD (currently only axis=1 supported)
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : ndarray, shape (n,)
+        MAD for each row
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=2] arr = np.asarray(x, dtype=np.float64, order='F')
     cdef int n = arr.shape[0]
     cdef int m = arr.shape[1]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
     if axis == 1:
         result = np.empty(n, dtype=np.float64)
-        hpcs_mad_axis1(&arr[0,0], n, m, &result[0], &status)
+        hpcs_mad_axis1(&arr[0,0], n, m, &result[0], c_mode, &status)
     else:
         raise ValueError("Only axis=1 currently supported")
 
@@ -938,9 +1305,9 @@ def axis_mad(x, int axis=1):
 # Python API - Masked Operations (Tier B)
 # ==============================================================================
 
-def sum_masked(x, mask):
+def sum_masked(x, mask, mode=None):
     """
-    Sum of array elements where mask is True/non-zero.
+    Sum of array elements where mask is True/non-zero (v0.8.0 with execution mode support).
 
     Parameters
     ----------
@@ -948,6 +1315,9 @@ def sum_masked(x, mask):
         Input array
     mask : array_like (bool or int)
         Mask array (True/non-zero = valid, False/0 = masked)
+    mode : str, optional
+        Execution mode: 'safe' (full validation), 'fast' (no validation),
+        'deterministic' (reproducible), or None (use global setting)
 
     Returns
     -------
@@ -959,60 +1329,133 @@ def sum_masked(x, mask):
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_sum_masked(&arr[0], <int*>&mask_arr[0], n, &result, &status)
+    hpcs_reduce_sum_masked(&arr[0], <int*>&mask_arr[0], n, &result, c_mode, &status)
     check_status(status, "sum_masked")
 
     return result
 
-def mean_masked(x, mask):
-    """Mean of array elements where mask is True/non-zero."""
+def mean_masked(x, mask, mode=None):
+    """
+    Mean of array elements where mask is True/non-zero.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    mask : array_like (bool or int)
+        Mask array (True/non-zero = valid, False/0 = masked)
+    mode : str, optional
+        Execution mode: 'safe' (full validation), 'fast' (no validation),
+        'deterministic' (reproducible), or None (use global setting)
+
+    Returns
+    -------
+    result : float
+        Mean of unmasked elements
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef cnp.ndarray[int, ndim=1] mask_arr = np.asarray(mask, dtype=np.int32)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_mean_masked(&arr[0], <int*>&mask_arr[0], n, &result, &status)
+    hpcs_reduce_mean_masked(&arr[0], <int*>&mask_arr[0], n, &result, c_mode, &status)
     check_status(status, "mean_masked")
 
     return result
 
-def var_masked(x, mask):
-    """Variance of array elements where mask is True/non-zero."""
+def var_masked(x, mask, mode=None):
+    """
+    Variance of array elements where mask is True/non-zero.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    mask : array_like (bool or int)
+        Mask array (True/non-zero = valid, False/0 = masked)
+    mode : str, optional
+        Execution mode: 'safe' (full validation), 'fast' (no validation),
+        'deterministic' (reproducible), or None (use global setting)
+
+    Returns
+    -------
+    result : float
+        Variance of unmasked elements
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef cnp.ndarray[int, ndim=1] mask_arr = np.asarray(mask, dtype=np.int32)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_reduce_variance_masked(&arr[0], <int*>&mask_arr[0], n, &result, &status)
+    hpcs_reduce_variance_masked(&arr[0], <int*>&mask_arr[0], n, &result, c_mode, &status)
     check_status(status, "var_masked")
 
     return result
 
-def median_masked(x, mask):
-    """Median of array elements where mask is True/non-zero."""
+def median_masked(x, mask, mode=None):
+    """
+    Median of array elements where mask is True/non-zero.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    mask : array_like
+        Mask array (non-zero values indicate valid elements)
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : float
+        Median of masked elements
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef cnp.ndarray[int, ndim=1] mask_arr = np.asarray(mask, dtype=np.int32)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_median_masked(&arr[0], <int*>&mask_arr[0], n, &result, &status)
+    hpcs_median_masked(&arr[0], <int*>&mask_arr[0], n, &result, c_mode, &status)
     check_status(status, "median_masked")
 
     return result
 
-def mad_masked(x, mask):
-    """MAD of array elements where mask is True/non-zero."""
+def mad_masked(x, mask, mode=None):
+    """
+    MAD of array elements where mask is True/non-zero.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array
+    mask : array_like
+        Mask array (non-zero values indicate valid elements)
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
+
+    Returns
+    -------
+    result : float
+        MAD of masked elements
+    """
     cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
     cdef cnp.ndarray[int, ndim=1] mask_arr = np.asarray(mask, dtype=np.int32)
     cdef int n = arr.shape[0]
     cdef double result
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_mad_masked(&arr[0], <int*>&mask_arr[0], n, &result, &status)
+    hpcs_mad_masked(&arr[0], <int*>&mask_arr[0], n, &result, c_mode, &status)
     check_status(status, "mad_masked")
 
     return result
@@ -1021,9 +1464,9 @@ def mad_masked(x, mask):
 # Python API - Additional Functions (Python-level implementations)
 # ==============================================================================
 
-def rolling_zscore(x, int window):
+def rolling_zscore(x, int window, mode=None):
     """
-    Rolling z-score normalization within a moving window (C-accelerated).
+    Rolling z-score normalization within a moving window.
 
     Computes (x[i] - rolling_mean) / rolling_std for each position.
     More efficient than separate rolling_mean + rolling_std calls.
@@ -1034,6 +1477,9 @@ def rolling_zscore(x, int window):
         Input array
     window : int
         Window size
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -1044,15 +1490,16 @@ def rolling_zscore(x, int window):
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_zscore(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_zscore(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_zscore")
 
     return result
 
-def rolling_robust_zscore(x, int window):
+def rolling_robust_zscore(x, int window, mode=None):
     """
-    Rolling robust z-score using median and MAD within a moving window (C-accelerated).
+    Rolling robust z-score using median and MAD.
 
     More resistant to outliers than rolling_zscore.
     More efficient than separate rolling_median + rolling_mad calls.
@@ -1063,6 +1510,9 @@ def rolling_robust_zscore(x, int window):
         Input array
     window : int
         Window size
+    mode : str, optional
+        Execution mode: 'safe', 'fast', or 'deterministic'.
+        If None (default), uses global mode setting.
 
     Returns
     -------
@@ -1073,8 +1523,9 @@ def rolling_robust_zscore(x, int window):
     cdef int n = arr.shape[0]
     cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
     cdef int status
+    cdef int c_mode = _parse_mode(mode)
 
-    hpcs_rolling_robust_zscore(&arr[0], n, window, &result[0], &status)
+    hpcs_rolling_robust_zscore(&arr[0], n, window, &result[0], c_mode, &status)
     check_status(status, "rolling_robust_zscore")
 
     return result
@@ -1272,7 +1723,7 @@ def rolling_mean_masked(x, int window, mask):
     return result
 
 # ==============================================================================
-# Calibration API (v0.5)
+# Calibration API
 # ==============================================================================
 
 def calibrate(quick=False):
@@ -1349,7 +1800,7 @@ def load_calibration_config(path):
     check_status(status, "load_calibration_config")
 
 # ==============================================================================
-# v0.8.0 API - Transform & Robust Statistics
+# Transform & Robust Statistics
 # ==============================================================================
 
 def ewma(x, alpha, mode=None):
@@ -1683,3 +2134,520 @@ def winsorized_mean(x, win_frac, mode=None):
     hpcs_winsorized_mean(&arr[0], n, win_frac, &result, c_mode, &status)
     check_status(status, "winsorized_mean")
     return result
+
+
+# ==============================================================================
+# Feature Discovery API
+# ==============================================================================
+
+def build_features():
+    """
+    Get bitmask of features compiled into the library.
+
+    Returns
+    -------
+    int
+        Bitmask of enabled features. Use FEAT_* constants to test:
+        - FEAT_OPENMP: OpenMP parallelization
+        - FEAT_SIMD_AVX2: AVX2 SIMD support
+        - FEAT_SIMD_AVX512: AVX-512 SIMD support
+        - FEAT_SIMD_NEON: ARM NEON support
+        - FEAT_FAST_MATH: Fast-math optimizations
+        - FEAT_GPU_OFFLOAD: GPU acceleration
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> features = hpcs.build_features()
+    >>> if features & hpcs.FEAT_OPENMP:
+    ...     print("OpenMP enabled")
+    """
+    return get_build_features()
+
+
+def last_error():
+    """
+    Get the last error message from a failing function.
+
+    Returns
+    -------
+    str
+        Error message, or empty string if no error
+
+    Notes
+    -----
+    Thread-local: each thread has its own error buffer.
+    """
+    cdef const char* msg = get_last_error()
+    if msg and msg[0] != 0:
+        return msg.decode('utf-8')
+    return ""
+
+
+# Feature bitmask constants for get_build_features()
+FEAT_OPENMP = HPCS_FEAT_OPENMP
+FEAT_SIMD_AVX2 = HPCS_FEAT_SIMD_AVX2
+FEAT_SIMD_AVX512 = HPCS_FEAT_SIMD_AVX512
+FEAT_SIMD_NEON = HPCS_FEAT_SIMD_NEON
+FEAT_FAST_MATH = HPCS_FEAT_FAST_MATH
+FEAT_GPU_OFFLOAD = HPCS_FEAT_GPU_OFFLOAD
+FEAT_CALIBRATED = HPCS_FEAT_CALIBRATED
+
+
+# ==============================================================================
+# workspace Class (v0.8.0)
+# ==============================================================================
+
+cdef class workspace:
+    """
+    Pre-allocated memory workspace for pipeline execution.
+
+    Provides 64-byte aligned memory for SIMD/cache efficiency.
+    NOT thread-safe - use one workspace per thread.
+
+    Parameters
+    ----------
+    bytes : int, optional
+        Initial capacity in bytes. Default: 64MB
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> ws = hpcs.workspace(64 * 1024 * 1024)  # 64MB
+    >>> print(ws.size)
+    67108864
+    >>> ws.reserve(128 * 1024 * 1024)  # Grow to 128MB
+    """
+    cdef workspace_t *_ws
+
+    def __cinit__(self, size_t bytes=67108864):  # 64MB default
+        cdef int status
+        cdef const char* err
+        cdef str detail
+        workspace_create(bytes, &self._ws, &status)
+        if status != HPCS_SUCCESS:
+            err = get_last_error()
+            detail = err.decode('utf-8') if err and err[0] != 0 else "allocation failed"
+            raise MemoryError(f"Failed to create workspace: {detail}")
+
+    def __dealloc__(self):
+        if self._ws != NULL:
+            workspace_free(self._ws)
+            self._ws = NULL
+
+    @property
+    def size(self):
+        """Current workspace capacity in bytes."""
+        return workspace_size(self._ws)
+
+    def reserve(self, size_t bytes):
+        """
+        Grow workspace to at least 'bytes' capacity.
+
+        Note: Old contents are NOT preserved.
+
+        Parameters
+        ----------
+        bytes : int
+            New minimum capacity
+        """
+        cdef int status
+        workspace_reserve(self._ws, bytes, &status)
+        check_status(status, "workspace_reserve")
+
+
+# ==============================================================================
+# pipeline Class (v0.8.0)
+# ==============================================================================
+
+cdef class pipeline:
+    """
+    Composable kernel execution pipeline.
+
+    Chains multiple kernels for efficient multi-stage processing.
+    Uses ping-pong buffers internally for intermediate results.
+
+    Parameters
+    ----------
+    ws : workspace, optional
+        Workspace for memory-intensive stages. If None, allocates internally.
+    mode : str, optional
+        Default execution mode: 'safe', 'fast', or 'deterministic'
+
+    Examples
+    --------
+    >>> import hpcs
+    >>> import numpy as np
+    >>>
+    >>> # Create pipeline
+    >>> pipe = hpcs.pipeline()
+    >>> pipe.diff(order=1)
+    >>> pipe.ewma(alpha=0.2)
+    >>> pipe.robust_zscore()
+    >>>
+    >>> # Execute
+    >>> x = np.random.randn(100000)
+    >>> result = pipe.execute(x)
+    >>>
+    >>> # View summary
+    >>> print(pipe.summary())
+    """
+    cdef pipeline_t *_plan
+    cdef workspace _ws
+    cdef str _mode
+
+    def __cinit__(self, workspace ws=None, str mode='safe'):
+        cdef int status
+        cdef workspace_t *ws_ptr = NULL
+        cdef const char* err
+        cdef str detail
+
+        if ws is not None:
+            self._ws = ws
+            ws_ptr = ws._ws
+
+        self._plan = pipeline_create(ws_ptr, &status)
+        if self._plan == NULL:
+            err = get_last_error()
+            detail = err.decode('utf-8') if err and err[0] != 0 else "allocation failed"
+            raise RuntimeError(f"Failed to create pipeline: {detail}")
+
+        self._mode = mode
+
+    def __dealloc__(self):
+        if self._plan != NULL:
+            pipeline_free(self._plan)
+            self._plan = NULL
+
+    def diff(self, int order=1):
+        """Add differencing stage: y[t] = x[t] - x[t-order]"""
+        cdef int status
+        pipeline_add_diff(self._plan, order, &status)
+        check_status(status, "pipeline_add_diff")
+        return self
+
+    def ewma(self, double alpha):
+        """Add exponential weighted moving average stage."""
+        cdef int status
+        pipeline_add_ewma(self._plan, alpha, &status)
+        check_status(status, "pipeline_add_ewma")
+        return self
+
+    def ewvar(self, double alpha):
+        """Add exponential weighted variance stage."""
+        cdef int status
+        pipeline_add_ewvar(self._plan, alpha, &status)
+        check_status(status, "pipeline_add_ewvar")
+        return self
+
+    def ewstd(self, double alpha):
+        """Add exponential weighted std deviation stage."""
+        cdef int status
+        pipeline_add_ewstd(self._plan, alpha, &status)
+        check_status(status, "pipeline_add_ewstd")
+        return self
+
+    def rolling_mean(self, int window):
+        """Add rolling mean stage."""
+        cdef int status
+        pipeline_add_rolling_mean(self._plan, window, &status)
+        check_status(status, "pipeline_add_rolling_mean")
+        return self
+
+    def rolling_std(self, int window):
+        """Add rolling std deviation stage."""
+        cdef int status
+        pipeline_add_rolling_std(self._plan, window, &status)
+        check_status(status, "pipeline_add_rolling_std")
+        return self
+
+    def rolling_median(self, int window):
+        """Add rolling median stage."""
+        cdef int status
+        pipeline_add_rolling_median(self._plan, window, &status)
+        check_status(status, "pipeline_add_rolling_median")
+        return self
+
+    def rolling_mad(self, int window):
+        """Add rolling MAD stage."""
+        cdef int status
+        pipeline_add_rolling_mad(self._plan, window, &status)
+        check_status(status, "pipeline_add_rolling_mad")
+        return self
+
+    def zscore(self):
+        """Add z-score normalization stage."""
+        cdef int status
+        pipeline_add_zscore(self._plan, &status)
+        check_status(status, "pipeline_add_zscore")
+        return self
+
+    def robust_zscore(self, double eps=1e-12):
+        """Add robust z-score (MAD-based) stage."""
+        cdef int status
+        pipeline_add_robust_zscore(self._plan, eps, &status)
+        check_status(status, "pipeline_add_robust_zscore")
+        return self
+
+    def normalize_minmax(self):
+        """Add min-max normalization stage."""
+        cdef int status
+        pipeline_add_normalize_minmax(self._plan, &status)
+        check_status(status, "pipeline_add_normalize_minmax")
+        return self
+
+    def clip(self, double min_val, double max_val):
+        """Add clipping stage."""
+        cdef int status
+        pipeline_add_clip(self._plan, min_val, max_val, &status)
+        check_status(status, "pipeline_add_clip")
+        return self
+
+    # -------------------------------------------------------------------------
+    # New Pipeline Stages (v0.8.0)
+    # -------------------------------------------------------------------------
+
+    def cumulative_min(self):
+        """Add cumulative minimum (running min) stage.
+
+        Computes the running minimum: y[t] = min(x[0:t+1])
+        Useful for tracking lowest values, loss floors.
+        """
+        cdef int status
+        pipeline_add_cumulative_min(self._plan, &status)
+        check_status(status, "pipeline_add_cumulative_min")
+        return self
+
+    def cumulative_max(self):
+        """Add cumulative maximum (running max / high-water mark) stage.
+
+        Computes the running maximum: y[t] = max(x[0:t+1])
+        Useful for tracking peak values, high-water marks in finance.
+        """
+        cdef int status
+        pipeline_add_cumulative_max(self._plan, &status)
+        check_status(status, "pipeline_add_cumulative_max")
+        return self
+
+    def fill_forward(self):
+        """Add forward fill (LOCF) stage.
+
+        Propagates the last valid (non-NaN) value forward.
+        Useful for handling missing data in time series.
+        """
+        cdef int status
+        pipeline_add_fill_forward(self._plan, &status)
+        check_status(status, "pipeline_add_fill_forward")
+        return self
+
+    def prefix_sum(self):
+        """Add cumulative sum (prefix sum) stage.
+
+        Computes inclusive prefix sum: y[i] = sum(x[0:i+1])
+        Useful for numerical integration, running totals.
+        """
+        cdef int status
+        pipeline_add_prefix_sum(self._plan, &status)
+        check_status(status, "pipeline_add_prefix_sum")
+        return self
+
+    def convolve(self, kernel):
+        """Add FIR filter convolution stage (valid mode).
+
+        Parameters
+        ----------
+        kernel : array_like
+            Filter kernel coefficients
+
+        Note: Output length = input_length - kernel_length + 1
+        Useful for signal processing (low-pass, high-pass filters).
+        """
+        cdef cnp.ndarray[cnp.float64_t, ndim=1] k = ensure_c_contiguous(kernel)
+        cdef int m = k.shape[0]
+        cdef int status
+        pipeline_add_convolve(self._plan, &k[0], m, &status)
+        check_status(status, "pipeline_add_convolve")
+        return self
+
+    def lag(self, int k=1):
+        """Add lag stage.
+
+        Parameters
+        ----------
+        k : int
+            Lag order (number of periods to shift back)
+
+        Computes: y[t] = x[t-k], with first k values set to NaN.
+        Useful for time-lagged analysis, autocorrelation features.
+        """
+        cdef int status
+        pipeline_add_lag(self._plan, k, &status)
+        check_status(status, "pipeline_add_lag")
+        return self
+
+    def log_return(self):
+        """Add log return stage.
+
+        Computes: y[t] = log(x[t] / x[t-1])
+        First value is NaN.
+
+        Foundation for volatility calculations, Sharpe ratio.
+        Preferred over simple returns for statistical properties.
+        """
+        cdef int status
+        pipeline_add_log_return(self._plan, &status)
+        check_status(status, "pipeline_add_log_return")
+        return self
+
+    def pct_change(self):
+        """Add percentage change stage.
+
+        Computes: y[t] = (x[t] - x[t-1]) / x[t-1]
+        First value is NaN.
+
+        Useful for simple returns, growth rates.
+        """
+        cdef int status
+        pipeline_add_pct_change(self._plan, &status)
+        check_status(status, "pipeline_add_pct_change")
+        return self
+
+    def scale(self, double factor):
+        """Add scale (multiplication) stage.
+
+        Parameters
+        ----------
+        factor : float
+            Scaling factor
+
+        Computes: y[i] = x[i] * factor
+        Useful for unit conversion, amplitude adjustment.
+        """
+        cdef int status
+        pipeline_add_scale(self._plan, factor, &status)
+        check_status(status, "pipeline_add_scale")
+        return self
+
+    def shift(self, double offset):
+        """Add shift (addition) stage.
+
+        Parameters
+        ----------
+        offset : float
+            Value to add
+
+        Computes: y[i] = x[i] + offset
+        Useful for baseline adjustment, centering.
+        """
+        cdef int status
+        pipeline_add_shift(self._plan, offset, &status)
+        check_status(status, "pipeline_add_shift")
+        return self
+
+    def abs(self):
+        """Add absolute value stage.
+
+        Computes: y[i] = |x[i]|
+        Useful for magnitude calculations, absolute deviations.
+        """
+        cdef int status
+        pipeline_add_abs(self._plan, &status)
+        check_status(status, "pipeline_add_abs")
+        return self
+
+    def sqrt(self):
+        """Add square root stage.
+
+        Computes: y[i] = sqrt(x[i])
+        Useful for converting variance to std, RMS calculations.
+        """
+        cdef int status
+        pipeline_add_sqrt(self._plan, &status)
+        check_status(status, "pipeline_add_sqrt")
+        return self
+
+    def execute(self, x):
+        """
+        Execute pipeline on input array.
+
+        Parameters
+        ----------
+        x : array_like
+            Input array
+
+        Returns
+        -------
+        result : ndarray
+            Processed output array (may be smaller than input if convolve is used)
+        """
+        cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+        cdef size_t n = arr.shape[0]
+        cdef size_t out_n = n
+        cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
+        cdef int status
+
+        # Set execution mode before running
+        if self._mode == 'fast':
+            set_execution_mode('fast')
+        elif self._mode == 'deterministic':
+            set_execution_mode('deterministic')
+        else:
+            set_execution_mode('safe')
+
+        pipeline_execute(self._plan, &arr[0], n, &result[0], &out_n, &status)
+        check_status(status, "pipeline_execute")
+
+        # Return only the valid output (may be smaller due to convolve)
+        if out_n < n:
+            return result[:out_n].copy()
+        return result
+
+    def execute_into(self, x, out):
+        """
+        Execute pipeline, writing to pre-allocated output.
+
+        Parameters
+        ----------
+        x : array_like
+            Input array
+        out : ndarray
+            Output array (must be same size as input)
+
+        Returns
+        -------
+        out_n : int
+            Actual number of output elements (may be < len(x) if convolve used)
+        """
+        cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
+        cdef cnp.ndarray[cnp.float64_t, ndim=1] out_arr = np.asarray(out, dtype=np.float64)
+        cdef size_t n = arr.shape[0]
+        cdef size_t out_n = n
+        cdef int status
+
+        if out_arr.shape[0] < n:
+            raise ValueError("Output array too small")
+
+        if self._mode == 'fast':
+            set_execution_mode('fast')
+        elif self._mode == 'deterministic':
+            set_execution_mode('deterministic')
+        else:
+            set_execution_mode('safe')
+
+        pipeline_execute(self._plan, &arr[0], n, &out_arr[0], &out_n, &status)
+        check_status(status, "pipeline_execute")
+        return out_n
+
+    def summary(self):
+        """
+        Get human-readable pipeline summary.
+
+        Returns
+        -------
+        str
+            Pipeline description with stages
+        """
+        cdef const char* s = pipeline_summary(self._plan)
+        if s:
+            return s.decode('utf-8')
+        return "Empty pipeline"

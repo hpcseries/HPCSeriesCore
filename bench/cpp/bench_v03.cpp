@@ -66,13 +66,13 @@ double bench_cpu_median(const vector<double>& data, const BenchConfig& cfg) {
 
     // Warmup
     for (int i = 0; i < cfg.warmup_iters; i++) {
-        hpcs_median(data.data(), n, &result, &status);
+        hpcs_median(data.data(), n, &result, HPCS_MODE_FAST, &status);
     }
 
     // Benchmark
     auto start = high_resolution_clock::now();
     for (int i = 0; i < cfg.bench_iters; i++) {
-        hpcs_median(data.data(), n, &result, &status);
+        hpcs_median(data.data(), n, &result, HPCS_MODE_FAST, &status);
     }
     auto end = high_resolution_clock::now();
 
@@ -86,13 +86,13 @@ double bench_cpu_mad(const vector<double>& data, const BenchConfig& cfg) {
 
     // Warmup
     for (int i = 0; i < cfg.warmup_iters; i++) {
-        hpcs_mad(data.data(), n, &result, &status);
+        hpcs_mad(data.data(), n, &result, HPCS_MODE_FAST, &status);
     }
 
     // Benchmark
     auto start = high_resolution_clock::now();
     for (int i = 0; i < cfg.bench_iters; i++) {
-        hpcs_mad(data.data(), n, &result, &status);
+        hpcs_mad(data.data(), n, &result, HPCS_MODE_FAST, &status);
     }
     auto end = high_resolution_clock::now();
 
@@ -106,13 +106,13 @@ double bench_cpu_quantile(const vector<double>& data, double q, const BenchConfi
 
     // Warmup
     for (int i = 0; i < cfg.warmup_iters; i++) {
-        hpcs_quantile(data.data(), n, q, &result, &status);
+        hpcs_quantile(data.data(), n, q, &result, HPCS_MODE_FAST, &status);
     }
 
     // Benchmark
     auto start = high_resolution_clock::now();
     for (int i = 0; i < cfg.bench_iters; i++) {
-        hpcs_quantile(data.data(), n, q, &result, &status);
+        hpcs_quantile(data.data(), n, q, &result, HPCS_MODE_FAST, &status);
     }
     auto end = high_resolution_clock::now();
 
@@ -126,13 +126,13 @@ double bench_cpu_rolling_median(const vector<double>& data, int window, const Be
 
     // Warmup
     for (int i = 0; i < cfg.warmup_iters; i++) {
-        hpcs_rolling_median(data.data(), n, window, out.data(), &status);
+        hpcs_rolling_median(data.data(), n, window, out.data(), HPCS_MODE_FAST, &status);
     }
 
     // Benchmark
     auto start = high_resolution_clock::now();
     for (int i = 0; i < cfg.bench_iters; i++) {
-        hpcs_rolling_median(data.data(), n, window, out.data(), &status);
+        hpcs_rolling_median(data.data(), n, window, out.data(), HPCS_MODE_FAST, &status);
     }
     auto end = high_resolution_clock::now();
 
@@ -146,13 +146,13 @@ double bench_cpu_rolling_mad(const vector<double>& data, int window, const Bench
 
     // Warmup
     for (int i = 0; i < cfg.warmup_iters; i++) {
-        hpcs_rolling_mad(data.data(), n, window, out.data(), &status);
+        hpcs_rolling_mad(data.data(), n, window, out.data(), HPCS_MODE_FAST, &status);
     }
 
     // Benchmark
     auto start = high_resolution_clock::now();
     for (int i = 0; i < cfg.bench_iters; i++) {
-        hpcs_rolling_mad(data.data(), n, window, out.data(), &status);
+        hpcs_rolling_mad(data.data(), n, window, out.data(), HPCS_MODE_FAST, &status);
     }
     auto end = high_resolution_clock::now();
 

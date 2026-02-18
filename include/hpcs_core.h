@@ -1,7 +1,31 @@
 #ifndef HPCS_CORE_H
 #define HPCS_CORE_H
 
+/* --------------------------------------------------------------------- */
+/* Version information                                                   */
+/* --------------------------------------------------------------------- */
+#define HPCS_VERSION_MAJOR 0
+#define HPCS_VERSION_MINOR 8
+#define HPCS_VERSION_PATCH 0
+#define HPCS_VERSION_STRING "0.8.0"
+
+/* ABI version (increment on breaking changes) */
+#define HPCS_ABI_VERSION 1
+
+/* --------------------------------------------------------------------- */
+/* Build feature flags (v0.8.0)                                          */
+/* --------------------------------------------------------------------- */
+/* Bitmask constants for get_build_features() */
+#define HPCS_FEAT_OPENMP        (1ULL << 0)   /* OpenMP parallelization enabled */
+#define HPCS_FEAT_SIMD_AVX2     (1ULL << 1)   /* AVX2 SIMD support compiled */
+#define HPCS_FEAT_SIMD_AVX512   (1ULL << 2)   /* AVX-512 SIMD support compiled */
+#define HPCS_FEAT_SIMD_NEON     (1ULL << 3)   /* ARM NEON SIMD support compiled */
+#define HPCS_FEAT_FAST_MATH     (1ULL << 4)   /* Fast-math optimizations enabled */
+#define HPCS_FEAT_GPU_OFFLOAD   (1ULL << 5)   /* GPU acceleration available */
+#define HPCS_FEAT_CALIBRATED    (1ULL << 6)   /* Calibration data loaded */
+
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,22 +35,24 @@ extern "C" {
 /* Status codes (must match hpcs_constants.f90)                          */
 /* --------------------------------------------------------------------- */
 enum {
-    HPCS_SUCCESS          = 0,
-    HPCS_ERR_INVALID_ARGS = 1,
-    HPCS_ERR_NUMERIC_FAIL = 2
-    /* add more here if you extend hpcs_constants later */
+    HPCS_SUCCESS           = 0,
+    HPCS_ERR_INVALID_ARGS  = 1,
+    HPCS_ERR_NUMERIC_FAIL  = 2,
+    HPCS_ERR_OUT_OF_MEMORY = 3,  /* v0.8.0: workspace/allocation failure */
+    HPCS_ERR_INTERNAL      = 4   /* v0.8.0: internal error */
 };
 
 /* --------------------------------------------------------------------- */
 /* 1D Kernels (hpcs_core_1d)                                             */
 /* --------------------------------------------------------------------- */
 
-/* rolling sum: y[i] = sum of last window values up to i */
+/* rolling sum: y[i] = sum of last window values up to i (v0.8.0 with execution mode support) */
 void hpcs_rolling_sum(
     const double *x,
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -36,24 +62,27 @@ void hpcs_rolling_mean(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
-/* rolling variance: population variance over rolling window (v0.2) */
+/* rolling variance: population variance over rolling window (v0.8.0 with execution mode support) */
 void hpcs_rolling_variance(
     const double *x,
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
-/* rolling std: standard deviation over rolling window (v0.2) */
+/* rolling std: standard deviation over rolling window (v0.8.0 with execution mode support) */
 void hpcs_rolling_std(
     const double *x,
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -74,6 +103,7 @@ void hpcs_reduce_sum(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -82,6 +112,7 @@ void hpcs_reduce_min(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -90,6 +121,7 @@ void hpcs_reduce_max(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -98,6 +130,7 @@ void hpcs_reduce_mean(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -106,6 +139,7 @@ void hpcs_reduce_variance(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -114,6 +148,7 @@ void hpcs_reduce_std(
     const double *x,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -124,6 +159,7 @@ void hpcs_group_reduce_sum(
     const int    *group_ids,
     int           n_groups,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -134,6 +170,7 @@ void hpcs_group_reduce_mean(
     const int    *group_ids,
     int           n_groups,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -144,6 +181,7 @@ void hpcs_group_reduce_variance(
     const int    *group_ids,
     int           n_groups,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -203,21 +241,23 @@ void hpcs_reduce_max_simd(
 /* Axis Reductions (v0.4 - 2D array operations)                         */
 /* --------------------------------------------------------------------- */
 
-/* Sum along axis 1 (per-row sum) - x is (n×m) Fortran-order */
+/* Sum along axis 1 (per-row sum) - x is (n×m) Fortran-order (v0.8.0 with execution mode support) */
 void hpcs_reduce_sum_axis1(
     const double *x,
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
-/* Mean along axis 1 (per-row mean) */
+/* Mean along axis 1 (per-row mean) (v0.8.0 with execution mode support) */
 void hpcs_reduce_mean_axis1(
     const double *x,
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -227,6 +267,7 @@ void hpcs_median_axis1(
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -236,6 +277,7 @@ void hpcs_mad_axis1(
     int           n,
     int           m,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -261,30 +303,33 @@ void hpcs_reduce_max_axis0_simd(
 /* Masked Reductions (v0.4 - operations on masked arrays)               */
 /* --------------------------------------------------------------------- */
 
-/* Sum of masked array (mask[i]=1 means valid, 0 means skip) */
+/* Sum of masked array (mask[i]=1 means valid, 0 means skip) (v0.8.0 with execution mode support) */
 void hpcs_reduce_sum_masked(
     const double *x,
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
-/* Mean of masked array */
+/* Mean of masked array (v0.8.0 with execution mode support) */
 void hpcs_reduce_mean_masked(
     const double *x,
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
-/* Variance of masked array */
+/* Variance of masked array (v0.8.0 with execution mode support) */
 void hpcs_reduce_variance_masked(
     const double *x,
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -294,6 +339,7 @@ void hpcs_median_masked(
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -303,6 +349,7 @@ void hpcs_mad_masked(
     const int    *mask,
     int           n,
     double       *out,
+    int           mode,
     int          *status
 );
 
@@ -482,6 +529,7 @@ void hpcs_median(
     const double *x,
     int           n,
     double       *median,
+    int           mode,
     int          *status
 );
 
@@ -490,6 +538,7 @@ void hpcs_mad(
     const double *x,
     int           n,
     double       *mad,
+    int           mode,
     int          *status
 );
 
@@ -499,6 +548,7 @@ void hpcs_quantile(
     int           n,
     double        q,
     double       *value,
+    int           mode,
     int          *status
 );
 
@@ -512,6 +562,7 @@ void hpcs_rolling_median(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -521,6 +572,7 @@ void hpcs_rolling_mad(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -530,6 +582,7 @@ void hpcs_rolling_zscore(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -539,6 +592,7 @@ void hpcs_rolling_robust_zscore(
     int           n,
     int           window,
     double       *y,
+    int           mode,
     int          *status
 );
 
@@ -1363,6 +1417,215 @@ void hpcs_save_config(const char *path, int *status);
  *   status - 0=success, 1=error (e.g., file not found)
  */
 void hpcs_load_config(const char *path, int *status);
+
+/* --------------------------------------------------------------------- */
+/* Version Query Functions (v0.8.0)                                      */
+/* --------------------------------------------------------------------- */
+
+/* Get library version string
+ *
+ * Returns semantic version string (e.g., "0.8.0")
+ * Used by downstream consumers to verify runtime compatibility.
+ *
+ * Returns:
+ *   Version string (statically allocated, do not free)
+ *
+ * Example:
+ *   const char* version = hpcs_get_version();
+ *   printf("HPCSeries Core version: %s\n", version);
+ */
+const char* hpcs_get_version(void);
+
+/* Get ABI version number
+ *
+ * Returns ABI compatibility version (incremented on breaking changes).
+ * Same major version = ABI compatible.
+ *
+ * Returns:
+ *   ABI version number (currently 1)
+ *
+ * Example:
+ *   int abi = hpcs_get_abi_version();
+ *   if (abi != EXPECTED_ABI) {
+ *       fprintf(stderr, "ABI mismatch!\n");
+ *   }
+ */
+int hpcs_get_abi_version(void);
+
+/* Get build feature bitmask (v0.8.0)
+ *
+ * Returns bitmask indicating which features are compiled into the library.
+ * Use HPCS_FEAT_* macros to test individual features.
+ *
+ * Returns:
+ *   Bitmask of enabled features
+ *
+ * Example:
+ *   uint64_t features = get_build_features();
+ *   if (features & HPCS_FEAT_OPENMP) printf("OpenMP enabled\n");
+ *   if (features & HPCS_FEAT_SIMD_AVX2) printf("AVX2 enabled\n");
+ */
+uint64_t get_build_features(void);
+
+/* --------------------------------------------------------------------- */
+/* Thread-local Error Handling (v0.8.0)                                  */
+/* --------------------------------------------------------------------- */
+
+/* Get last error message (v0.8.0)
+ *
+ * Returns the last error message set by a failing function.
+ * Thread-local: each thread has its own error buffer.
+ * Cleared on successful function calls.
+ *
+ * Returns:
+ *   Error message string (thread-local, do not free)
+ *   Empty string if no error occurred
+ */
+const char* get_last_error(void);
+
+/* Set last error message (internal use) */
+void set_last_error(const char* msg);
+
+/* Clear last error message (internal use) */
+void clear_last_error(void);
+
+/* ============================================================================
+ * v0.8.0: WORKSPACE MEMORY MANAGEMENT
+ * ============================================================================
+ * Pre-allocated memory pool for pipeline execution.
+ *
+ * Key Features:
+ * - 64-byte aligned for SIMD/cache efficiency
+ * - NOT thread-safe (use one workspace per thread)
+ * - Growable via reserve()
+ *
+ * Typical Usage:
+ *   workspace_t *ws;
+ *   workspace_create(64*1024*1024, &ws, &status);  // 64MB
+ *   // ... use with pipelines ...
+ *   workspace_free(ws);
+ * ========================================================================== */
+
+typedef struct workspace workspace_t;
+
+/* Create workspace with specified capacity
+ *
+ * Parameters:
+ *   bytes  - Minimum capacity in bytes
+ *   ws     - Output: workspace handle
+ *   status - 0=success, 3=out of memory
+ */
+void workspace_create(size_t bytes, workspace_t **ws, int *status);
+
+/* Free workspace and underlying buffer */
+void workspace_free(workspace_t *ws);
+
+/* Query current workspace capacity in bytes */
+size_t workspace_size(const workspace_t *ws);
+
+/* Grow workspace if bytes > current capacity
+ *
+ * Note: Old contents are NOT preserved (per spec).
+ *
+ * Parameters:
+ *   ws     - Workspace to grow
+ *   bytes  - New minimum capacity
+ *   status - 0=success, 1=invalid args, 3=out of memory
+ */
+void workspace_reserve(workspace_t *ws, size_t bytes, int *status);
+
+/* ============================================================================
+ * v0.8.0: PIPELINE/PLAN API
+ * ============================================================================
+ * Composable kernel execution for multi-stage data processing.
+ *
+ * Key Features:
+ * - Chain multiple kernels (diff -> ewma -> robust_zscore)
+ * - Ping-pong buffer management for intermediates
+ * - Optional workspace for memory-intensive stages
+ *
+ * Typical Usage:
+ *   pipeline_t *plan = pipeline_create(ws, &status);
+ *   pipeline_add_diff(plan, 1, &status);
+ *   pipeline_add_ewma(plan, 0.2, &status);
+ *   pipeline_add_robust_zscore(plan, 1e-12, &status);
+ *   pipeline_execute(plan, x, n, out, &status);
+ *   pipeline_free(plan);
+ * ========================================================================== */
+
+typedef struct pipeline pipeline_t;
+
+/* Create execution plan
+ *
+ * Parameters:
+ *   ws     - Optional workspace (can be NULL for simple pipelines)
+ *   status - 0=success, 3=out of memory
+ *
+ * Returns:
+ *   New plan handle, or NULL on error
+ */
+pipeline_t* pipeline_create(workspace_t *ws, int *status);
+
+/* Free plan and all associated resources */
+void pipeline_free(pipeline_t *plan);
+
+/* --------------------------------------------------------------------- */
+/* Pipeline Stage Addition Functions                                     */
+/* --------------------------------------------------------------------- */
+/* All return stage index (>=0) on success, -1 on error */
+
+int pipeline_add_diff(pipeline_t *plan, int order, int *status);
+int pipeline_add_ewma(pipeline_t *plan, double alpha, int *status);
+int pipeline_add_ewvar(pipeline_t *plan, double alpha, int *status);
+int pipeline_add_ewstd(pipeline_t *plan, double alpha, int *status);
+int pipeline_add_rolling_mean(pipeline_t *plan, int window, int *status);
+int pipeline_add_rolling_std(pipeline_t *plan, int window, int *status);
+int pipeline_add_rolling_median(pipeline_t *plan, int window, int *status);
+int pipeline_add_rolling_mad(pipeline_t *plan, int window, int *status);
+int pipeline_add_zscore(pipeline_t *plan, int *status);
+int pipeline_add_robust_zscore(pipeline_t *plan, double eps, int *status);
+int pipeline_add_normalize_minmax(pipeline_t *plan, int *status);
+int pipeline_add_clip(pipeline_t *plan, double min_val, double max_val, int *status);
+
+/* New pipeline stages (v0.8.0) */
+int pipeline_add_cumulative_min(pipeline_t *plan, int *status);
+int pipeline_add_cumulative_max(pipeline_t *plan, int *status);
+int pipeline_add_fill_forward(pipeline_t *plan, int *status);
+int pipeline_add_prefix_sum(pipeline_t *plan, int *status);
+int pipeline_add_convolve(pipeline_t *plan, const double *kernel, int m, int *status);
+int pipeline_add_lag(pipeline_t *plan, int k, int *status);
+int pipeline_add_log_return(pipeline_t *plan, int *status);
+int pipeline_add_pct_change(pipeline_t *plan, int *status);
+int pipeline_add_scale(pipeline_t *plan, double factor, int *status);
+int pipeline_add_shift(pipeline_t *plan, double offset, int *status);
+int pipeline_add_abs(pipeline_t *plan, int *status);
+int pipeline_add_sqrt(pipeline_t *plan, int *status);
+
+/* Execute plan on input array
+ *
+ * Parameters:
+ *   plan   - Execution plan
+ *   x      - Input array
+ *   n      - Number of elements
+ *   out    - Output array (must be pre-allocated, same size as x)
+ *   out_n  - Output: actual number of elements in result (may be < n for convolve)
+ *   status - 0=success, 1=invalid args, 2=numeric failure, 3=workspace too small
+ */
+void pipeline_execute(
+    const pipeline_t *plan,
+    const double *x,
+    size_t n,
+    double *out,
+    size_t *out_n,
+    int *status
+);
+
+/* Get human-readable plan summary
+ *
+ * Returns:
+ *   Summary string (internal buffer, do not free)
+ */
+const char* pipeline_summary(const pipeline_t *plan);
 
 #ifdef __cplusplus
 }

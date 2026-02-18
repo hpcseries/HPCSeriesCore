@@ -1,4 +1,4 @@
-# HPCSeries Core v0.7 - Python Development Dockerfile
+# HPCSeries Core v0.8.0 - Python Development Dockerfile
 # Extends existing C/Fortran build with Python bindings support
 
 FROM ubuntu:22.04
@@ -32,30 +32,38 @@ COPY . /workspace/
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache-dir -r requirements.txt
 
-# Build C library first
-RUN cmake -S . -B build && \
+# Build C library first (shared library for Python bindings)
+RUN cmake -S . -B build -DBUILD_SHARED_LIBS=ON && \
     cmake --build build -j$(nproc) && \
-    ls -lh build/libhpcs_core.a
+    ls -lh build/libhpcs_core.so*
 
-# Set Python path (before building extensions)
+# Set Python path and library path (before building extensions)
 ENV PYTHONPATH="/workspace/python"
+ENV LD_LIBRARY_PATH="/workspace/build:${LD_LIBRARY_PATH}"
 
 # Clean any existing build artifacts
 RUN rm -rf build/lib.* build/temp.* python/hpcs/*.so python/hpcs/*.c dist/ *.egg-info python/hpcs.egg-info
 
-# Build Python extensions (development mode)
-# Using --no-build-isolation to use system packages, -v for verbose output
-RUN python3 -m pip install -e . --no-build-isolation -v 2>&1 | tee /tmp/build.log || \
-    (echo "=== BUILD FAILED ===" && \
-     echo "Last 50 lines of build log:" && \
-     tail -50 /tmp/build.log && \
+# Build Python extensions explicitly (before pip install)
+# This ensures Cython extensions are built in-place
+RUN python3 setup.py build_ext --inplace -v 2>&1 | tee /tmp/build_ext.log || \
+    (echo "=== EXTENSION BUILD FAILED ===" && \
+     echo "Last 100 lines of build log:" && \
+     tail -100 /tmp/build_ext.log && \
      echo "" && \
-     echo "Library check:" && \
-     ls -lh build/libhpcs_core.a && \
+     echo "Library path:" && \
+     echo $LD_LIBRARY_PATH && \
      echo "" && \
-     echo "Build directory:" && \
-     ls -lh build/ | head -20 && \
-     exit 1)
+     echo "Library files:" && \
+     ls -la build/libhpcs_core* && \
+     exit 1) && \
+    echo "=== Extension build complete ===" && \
+    echo "Built .so files:" && \
+    find python/hpcs -name "*.so" -type f && \
+    ls -la python/hpcs/
+
+# Install package in editable mode (extensions already built)
+RUN python3 -m pip install -e . --no-build-isolation --no-deps
 
 # Verify the extension was built
 RUN python3 -c "import hpcs; print(f'HPCSeries version: {hpcs.__version__}')" && \

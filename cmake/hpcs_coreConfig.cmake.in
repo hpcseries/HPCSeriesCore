@@ -1,0 +1,41 @@
+#
+# HPCSeries Core CMake Package Configuration
+#
+# Enables downstream projects to find and link against HPCSeries Core
+# using: find_package(hpcs_core CONFIG REQUIRED)
+#
+# This file is generated during installation and provides the hpcs::hpcs_core target
+# for SignalCore and other C++ consumers.
+#
+# Example usage in downstream CMakeLists.txt:
+#   find_package(hpcs_core 0.8 CONFIG REQUIRED)
+#   target_link_libraries(my_target PRIVATE hpcs::hpcs_core)
+#
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies required by HPCSeries Core
+# OpenMP is required (Core uses Fortran component, but we let CMake handle transitive dependencies)
+# Downstream projects should enable OpenMP for their own language (C++, C, etc.)
+find_dependency(OpenMP)
+
+# Include target definitions (hpcs::hpcs_core)
+include("${CMAKE_CURRENT_LIST_DIR}/hpcs_coreTargets.cmake")
+
+# Verify all required components are present
+check_required_components(hpcs_core)
+
+# Provide version information
+set(hpcs_core_VERSION_MAJOR @PROJECT_VERSION_MAJOR@)
+set(hpcs_core_VERSION_MINOR @PROJECT_VERSION_MINOR@)
+set(hpcs_core_VERSION_PATCH @PROJECT_VERSION_PATCH@)
+set(hpcs_core_VERSION @PROJECT_VERSION@)
+
+# Display configuration information
+if(NOT hpcs_core_FIND_QUIETLY)
+    message(STATUS "Found HPCSeries Core ${hpcs_core_VERSION}")
+    message(STATUS "  Include directory: ${PACKAGE_PREFIX_DIR}/include")
+    message(STATUS "  Library: hpcs::hpcs_core")
+endif()

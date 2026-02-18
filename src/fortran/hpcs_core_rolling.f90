@@ -27,6 +27,7 @@ module hpcs_core_rolling
   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
   use hpcs_constants
   use hpcs_core_stats, only: hpcs_median
+  use hpcs_core_execution_mode, only: hpcs_get_execution_mode_internal
   implicit none
   private
   public :: hpcs_rolling_median
@@ -36,7 +37,7 @@ module hpcs_core_rolling
 contains
 
   !--------------------------------------------------------------------------
-  ! hpcs_rolling_median
+  ! hpcs_rolling_median - Dispatcher
   !
   ! Compute the median within a sliding window of length window across x.
   ! The output y has length n.  For indices i < window the output is set to
@@ -50,11 +51,46 @@ contains
   !   n      - int             number of elements
   !   window - int             window length
   !   y      - double*         output array of length n
+  !   mode   - int             execution mode (SAFE/FAST/DETERMINISTIC/USE_GLOBAL)
   !   status - int*            output status code
   !
   !--------------------------------------------------------------------------
-  subroutine hpcs_rolling_median(x, n, window, y, status) &
+  subroutine hpcs_rolling_median(x, n, window, y, mode, status) &
        bind(C, name="hpcs_rolling_median")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+    integer(c_int)              :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_rolling_median_safe(x, n, window, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_rolling_median_fast(x, n, window, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_rolling_median_deterministic(x, n, window, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_rolling_median
+
+  !--------------------------------------------------------------------------
+  ! hpcs_rolling_median_safe - SAFE mode implementation
+  !--------------------------------------------------------------------------
+  subroutine hpcs_rolling_median_safe(x, n, window, y, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -84,24 +120,120 @@ contains
       y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
     end do
 
-    ! Compute median for each full window
+    ! Compute median for each full window (SAFE mode)
     do i = w_eff, n_eff
       start = i - w_eff + 1_c_int
       ! copy current window into buffer
       do j = 1_c_int, w_eff
         buf(j) = x(start + j - 1_c_int)
       end do
-      ! compute median of buffer
-      call hpcs_median(buf, w_eff, y(i), st)
+      ! compute median of buffer using SAFE mode
+      call hpcs_median(buf, w_eff, y(i), HPCS_MODE_SAFE, st)
       ! If hpcs_median returns invalid args it should not happen here
     end do
 
     deallocate(buf)
     status = HPCS_SUCCESS
-  end subroutine hpcs_rolling_median
+  end subroutine hpcs_rolling_median_safe
 
   !--------------------------------------------------------------------------
-  ! hpcs_rolling_mad
+  ! hpcs_rolling_median_fast - FAST mode implementation (no NaN checks)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_rolling_median_fast(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, w_eff
+    integer(c_int)             :: i, j, start
+    real(c_double), allocatable :: buf(:)
+    integer(c_int)             :: st
+
+    n_eff = n
+    w_eff = window
+    ! Validate arguments
+    if (n_eff <= 0_c_int .or. w_eff <= 0_c_int .or. w_eff > n_eff) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Allocate buffer for window contents
+    allocate(buf(w_eff))
+
+    ! Initialise the first (window-1) outputs to NaN
+    do i = 1_c_int, w_eff - 1_c_int
+      y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+    end do
+
+    ! Compute median for each full window (FAST mode)
+    do i = w_eff, n_eff
+      start = i - w_eff + 1_c_int
+      ! copy current window into buffer
+      do j = 1_c_int, w_eff
+        buf(j) = x(start + j - 1_c_int)
+      end do
+      ! compute median of buffer using FAST mode (no NaN checks)
+      call hpcs_median(buf, w_eff, y(i), HPCS_MODE_FAST, st)
+    end do
+
+    deallocate(buf)
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_median_fast
+
+  !--------------------------------------------------------------------------
+  ! hpcs_rolling_median_deterministic - DETERMINISTIC mode (bit-exact)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_rolling_median_deterministic(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, w_eff
+    integer(c_int)             :: i, j, start
+    real(c_double), allocatable :: buf(:)
+    integer(c_int)             :: st
+
+    n_eff = n
+    w_eff = window
+    ! Validate arguments
+    if (n_eff <= 0_c_int .or. w_eff <= 0_c_int .or. w_eff > n_eff) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Allocate buffer for window contents
+    allocate(buf(w_eff))
+
+    ! Initialise the first (window-1) outputs to NaN
+    do i = 1_c_int, w_eff - 1_c_int
+      y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+    end do
+
+    ! Compute median for each full window (DETERMINISTIC mode)
+    do i = w_eff, n_eff
+      start = i - w_eff + 1_c_int
+      ! copy current window into buffer
+      do j = 1_c_int, w_eff
+        buf(j) = x(start + j - 1_c_int)
+      end do
+      ! compute median of buffer using DETERMINISTIC mode
+      call hpcs_median(buf, w_eff, y(i), HPCS_MODE_DETERMINISTIC, st)
+    end do
+
+    deallocate(buf)
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_median_deterministic
+
+  !--------------------------------------------------------------------------
+  ! hpcs_rolling_mad - Dispatcher
   !
   ! Compute the median absolute deviation within a sliding window.  For
   ! i < window the output y(i) is NaN.  For i >= window, y(i) is the MAD of
@@ -116,11 +248,46 @@ contains
   !   n      - int             number of elements
   !   window - int             window length
   !   y      - double*         output array of length n
+  !   mode   - int             execution mode (SAFE/FAST/DETERMINISTIC/USE_GLOBAL)
   !   status - int*            output status code
   !
   !--------------------------------------------------------------------------
-  subroutine hpcs_rolling_mad(x, n, window, y, status) &
+  subroutine hpcs_rolling_mad(x, n, window, y, mode, status) &
        bind(C, name="hpcs_rolling_mad")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+    integer(c_int)              :: effective_mode
+
+    ! Resolve mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_rolling_mad_safe(x, n, window, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_rolling_mad_fast(x, n, window, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_rolling_mad_deterministic(x, n, window, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_rolling_mad
+
+  !--------------------------------------------------------------------------
+  ! hpcs_rolling_mad_safe - SAFE mode implementation
+  !--------------------------------------------------------------------------
+  subroutine hpcs_rolling_mad_safe(x, n, window, y, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -151,15 +318,15 @@ contains
       y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
     end do
 
-    ! Loop over each window
+    ! Loop over each window (SAFE mode)
     do i = w_eff, n_eff
       start = i - w_eff + 1_c_int
       ! Copy window values
       do j = 1_c_int, w_eff
         buf(j) = x(start + j - 1_c_int)
       end do
-      ! Compute median of window
-      call hpcs_median(buf, w_eff, med_local, st)
+      ! Compute median of window using SAFE mode
+      call hpcs_median(buf, w_eff, med_local, HPCS_MODE_SAFE, st)
       if (st /= HPCS_SUCCESS) then
         ! Should not happen for valid window sizes; mark as NaN
         y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
@@ -174,8 +341,8 @@ contains
       do j = 1_c_int, w_eff
         dev(j) = abs(buf(j) - med_local)
       end do
-      ! Compute median of deviations
-      call hpcs_median(dev, w_eff, mad_local, st)
+      ! Compute median of deviations using SAFE mode
+      call hpcs_median(dev, w_eff, mad_local, HPCS_MODE_SAFE, st)
       if (st /= HPCS_SUCCESS) then
         y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
       else
@@ -191,7 +358,145 @@ contains
     deallocate(buf)
     deallocate(dev)
     status = HPCS_SUCCESS
-  end subroutine hpcs_rolling_mad
+  end subroutine hpcs_rolling_mad_safe
+
+  !--------------------------------------------------------------------------
+  ! hpcs_rolling_mad_fast - FAST mode implementation (no NaN checks)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_rolling_mad_fast(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, w_eff
+    integer(c_int)             :: i, j, start
+    real(c_double), allocatable :: buf(:), dev(:)
+    real(c_double)             :: med_local, mad_local
+    integer(c_int)             :: st
+
+    n_eff = n
+    w_eff = window
+    ! Validate arguments
+    if (n_eff <= 0_c_int .or. w_eff <= 0_c_int .or. w_eff > n_eff) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    allocate(buf(w_eff))
+    allocate(dev(w_eff))
+
+    ! Initialise undefined outputs to NaN for positions before the first full window
+    do i = 1_c_int, w_eff - 1_c_int
+      y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+    end do
+
+    ! Loop over each window (FAST mode - no NaN checks)
+    do i = w_eff, n_eff
+      start = i - w_eff + 1_c_int
+      ! Copy window values
+      do j = 1_c_int, w_eff
+        buf(j) = x(start + j - 1_c_int)
+      end do
+      ! Compute median of window using FAST mode
+      call hpcs_median(buf, w_eff, med_local, HPCS_MODE_FAST, st)
+      ! Compute absolute deviations from median
+      do j = 1_c_int, w_eff
+        dev(j) = abs(buf(j) - med_local)
+      end do
+      ! Compute median of deviations using FAST mode
+      call hpcs_median(dev, w_eff, mad_local, HPCS_MODE_FAST, st)
+      ! Check degeneracy: if mad_local is approximately zero, set to zero
+      if (mad_local < 1.0e-12_c_double) then
+        y(i) = 0.0_c_double
+      else
+        y(i) = mad_local
+      end if
+    end do
+
+    deallocate(buf)
+    deallocate(dev)
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_mad_fast
+
+  !--------------------------------------------------------------------------
+  ! hpcs_rolling_mad_deterministic - DETERMINISTIC mode (bit-exact)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_rolling_mad_deterministic(x, n, window, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: window
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int)             :: n_eff, w_eff
+    integer(c_int)             :: i, j, start
+    real(c_double), allocatable :: buf(:), dev(:)
+    real(c_double)             :: med_local, mad_local
+    integer(c_int)             :: st
+
+    n_eff = n
+    w_eff = window
+    ! Validate arguments
+    if (n_eff <= 0_c_int .or. w_eff <= 0_c_int .or. w_eff > n_eff) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    allocate(buf(w_eff))
+    allocate(dev(w_eff))
+
+    ! Initialise undefined outputs to NaN for positions before the first full window
+    do i = 1_c_int, w_eff - 1_c_int
+      y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+    end do
+
+    ! Loop over each window (DETERMINISTIC mode)
+    do i = w_eff, n_eff
+      start = i - w_eff + 1_c_int
+      ! Copy window values
+      do j = 1_c_int, w_eff
+        buf(j) = x(start + j - 1_c_int)
+      end do
+      ! Compute median of window using DETERMINISTIC mode
+      call hpcs_median(buf, w_eff, med_local, HPCS_MODE_DETERMINISTIC, st)
+      if (st /= HPCS_SUCCESS) then
+        ! Should not happen for valid window sizes; mark as NaN
+        y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+        cycle
+      end if
+      if (med_local /= med_local) then
+        ! median is NaN -> propagate NaN to this position
+        y(i) = med_local
+        cycle
+      end if
+      ! Compute absolute deviations from median
+      do j = 1_c_int, w_eff
+        dev(j) = abs(buf(j) - med_local)
+      end do
+      ! Compute median of deviations using DETERMINISTIC mode
+      call hpcs_median(dev, w_eff, mad_local, HPCS_MODE_DETERMINISTIC, st)
+      if (st /= HPCS_SUCCESS) then
+        y(i) = ieee_value(0.0_c_double, ieee_quiet_nan)
+      else
+        ! Check degeneracy: if mad_local is approximately zero, set to zero
+        if (mad_local < 1.0e-12_c_double) then
+          y(i) = 0.0_c_double
+        else
+          y(i) = mad_local
+        end if
+      end if
+    end do
+
+    deallocate(buf)
+    deallocate(dev)
+    status = HPCS_SUCCESS
+  end subroutine hpcs_rolling_mad_deterministic
 
   !--------------------------------------------------------------------------
   ! hpcs_rolling_anomalies
@@ -276,7 +581,7 @@ contains
       end if
 
       ! Compute median of window
-      call hpcs_median(buf, window_eff, med, st)
+      call hpcs_median(buf, window_eff, med, HPCS_MODE_SAFE, st)
       if (st /= HPCS_SUCCESS) then
         anomaly(i) = 0_c_int
         cycle
@@ -293,7 +598,7 @@ contains
       end do
 
       ! Median of absolute deviations
-      call hpcs_median(dev, window_eff, mad_val, st)
+      call hpcs_median(dev, window_eff, mad_val, HPCS_MODE_SAFE, st)
       if (st /= HPCS_SUCCESS) then
         anomaly(i) = 0_c_int
         cycle

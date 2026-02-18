@@ -859,7 +859,7 @@ contains
     ! -----------------------------------------------------------------------
     ! CPU Fallback (when GPU not available or policy=CPU_ONLY)
     ! -----------------------------------------------------------------------
-    call hpcs_median(data_array, n, median_val, status)
+    call hpcs_median(data_array, n, median_val, HPCS_MODE_SAFE, status)
 #endif
 
   end subroutine hpcs_accel_median
@@ -934,7 +934,7 @@ contains
     ! -----------------------------------------------------------------------
     ! CPU Fallback (when GPU not available or policy=CPU_ONLY)
     ! -----------------------------------------------------------------------
-    call hpcs_mad(data_array, n, mad_val, status)
+    call hpcs_mad(data_array, n, mad_val, HPCS_MODE_SAFE, status)
 #endif
 
   end subroutine hpcs_accel_mad
@@ -1024,7 +1024,7 @@ contains
     ! -----------------------------------------------------------------------
     ! CPU Fallback (when GPU not available or policy=CPU_ONLY)
     ! -----------------------------------------------------------------------
-    call hpcs_rolling_median(input_array, n, window, output_array, status)
+    call hpcs_rolling_median(input_array, n, window, output_array, HPCS_MODE_SAFE, status)
 #endif
 
     ! Return pointer to output
@@ -1094,7 +1094,7 @@ contains
     ! -----------------------------------------------------------------------
     ! CPU Fallback (when GPU not available or policy=CPU_ONLY)
     ! -----------------------------------------------------------------------
-    call hpcs_reduce_sum(data_array, n, result, status)
+    call hpcs_reduce_sum(data_array, n, result, HPCS_MODE_USE_GLOBAL, status)
 #endif
 
   end subroutine hpcs_accel_reduce_sum

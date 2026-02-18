@@ -466,3 +466,432 @@ class TestPerformance:
             print(f"\n  HPCSeries: {hpcs_time*1000:.2f} ms")
             print(f"  pandas:    {pandas_time*1000:.2f} ms")
             print(f"  Speedup:   {pandas_time/hpcs_time:.2f}x")
+
+
+# ============================================================================
+# Pipeline API Tests - New Stages (v0.8.0)
+# ============================================================================
+# Tests for 12 new pipeline stages:
+# - cumulative_min, cumulative_max: Running min/max
+# - fill_forward: Forward fill (LOCF)
+# - prefix_sum: Cumulative sum
+# - convolve: FIR filter convolution
+# - lag: Time-lagged values
+# - log_return, pct_change: Financial returns
+# - scale, shift: Linear transformations
+# - abs, sqrt: Element-wise math operations
+
+
+class TestPipelineCumulativeStages:
+    """Test pipeline cumulative_min and cumulative_max stages."""
+
+    def test_cumulative_min_basic(self):
+        """Test running minimum."""
+        pipe = hpcs.pipeline()
+        pipe.cumulative_min()
+
+        x = np.array([5.0, 3.0, 7.0, 2.0, 8.0])
+        result = pipe.execute(x)
+
+        expected = np.array([5.0, 3.0, 3.0, 2.0, 2.0])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_cumulative_max_basic(self):
+        """Test running maximum (high-water mark)."""
+        pipe = hpcs.pipeline()
+        pipe.cumulative_max()
+
+        x = np.array([1.0, 3.0, 2.0, 5.0, 4.0])
+        result = pipe.execute(x)
+
+        expected = np.array([1.0, 3.0, 3.0, 5.0, 5.0])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_cumulative_min_monotonic_increasing(self):
+        """Cumulative min of increasing sequence is first element."""
+        pipe = hpcs.pipeline()
+        pipe.cumulative_min()
+
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        result = pipe.execute(x)
+
+        expected = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_cumulative_max_monotonic_decreasing(self):
+        """Cumulative max of decreasing sequence is first element."""
+        pipe = hpcs.pipeline()
+        pipe.cumulative_max()
+
+        x = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        result = pipe.execute(x)
+
+        expected = np.array([5.0, 5.0, 5.0, 5.0, 5.0])
+        np.testing.assert_array_equal(result, expected)
+
+
+class TestPipelineFillForward:
+    """Test pipeline fill_forward stage."""
+
+    def test_fill_forward_basic(self):
+        """Test forward fill (LOCF)."""
+        pipe = hpcs.pipeline()
+        pipe.fill_forward()
+
+        x = np.array([1.0, np.nan, np.nan, 4.0, np.nan])
+        result = pipe.execute(x)
+
+        expected = np.array([1.0, 1.0, 1.0, 4.0, 4.0])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_fill_forward_no_nans(self):
+        """Fill forward with no NaNs should pass through."""
+        pipe = hpcs.pipeline()
+        pipe.fill_forward()
+
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        result = pipe.execute(x)
+
+        np.testing.assert_array_equal(result, x)
+
+    def test_fill_forward_leading_nan(self):
+        """Fill forward with leading NaN keeps the NaN."""
+        pipe = hpcs.pipeline()
+        pipe.fill_forward()
+
+        x = np.array([np.nan, np.nan, 3.0, np.nan, 5.0])
+        result = pipe.execute(x)
+
+        # Leading NaNs remain NaN
+        assert np.isnan(result[0])
+        assert np.isnan(result[1])
+        np.testing.assert_array_equal(result[2:], [3.0, 3.0, 5.0])
+
+
+class TestPipelinePrefixSum:
+    """Test pipeline prefix_sum stage."""
+
+    def test_prefix_sum_basic(self):
+        """Test cumulative sum."""
+        pipe = hpcs.pipeline()
+        pipe.prefix_sum()
+
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        result = pipe.execute(x)
+
+        expected = np.array([1.0, 3.0, 6.0, 10.0, 15.0])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_prefix_sum_matches_numpy(self):
+        """Prefix sum should match np.cumsum."""
+        pipe = hpcs.pipeline()
+        pipe.prefix_sum()
+
+        x = np.random.randn(100)
+        result = pipe.execute(x)
+
+        np.testing.assert_allclose(result, np.cumsum(x), rtol=1e-10)
+
+
+class TestPipelineConvolve:
+    """Test pipeline convolve stage."""
+
+    def test_convolve_basic(self):
+        """Test FIR filter convolution."""
+        pipe = hpcs.pipeline()
+        kernel = np.array([0.25, 0.5, 0.25])  # Simple smoothing filter
+        pipe.convolve(kernel)
+
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        result = pipe.execute(x)
+
+        # Valid mode: output length = 5 - 3 + 1 = 3
+        assert len(result) == 3
+
+    def test_convolve_moving_average(self):
+        """Test moving average via convolution."""
+        pipe = hpcs.pipeline()
+        kernel = np.ones(3) / 3.0  # 3-point moving average
+        pipe.convolve(kernel)
+
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        result = pipe.execute(x)
+
+        # Expected: [2.0, 3.0, 4.0] (averages of [1,2,3], [2,3,4], [3,4,5])
+        expected = np.array([2.0, 3.0, 4.0])
+        np.testing.assert_allclose(result, expected, rtol=1e-10)
+
+    def test_convolve_output_length(self):
+        """Test convolution output length is correct."""
+        for m in [3, 5, 7, 9]:
+            pipe = hpcs.pipeline()
+            kernel = np.ones(m) / m
+            pipe.convolve(kernel)
+
+            x = np.random.randn(100)
+            result = pipe.execute(x)
+
+            expected_len = 100 - m + 1
+            assert len(result) == expected_len, f"Kernel size {m}: expected {expected_len}, got {len(result)}"
+
+
+class TestPipelineLag:
+    """Test pipeline lag stage."""
+
+    def test_lag_basic(self):
+        """Test lag operator."""
+        pipe = hpcs.pipeline()
+        pipe.lag(k=2)
+
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        result = pipe.execute(x)
+
+        assert np.isnan(result[0])
+        assert np.isnan(result[1])
+        np.testing.assert_array_equal(result[2:], x[:3])
+
+    def test_lag_k1(self):
+        """Test lag with k=1."""
+        pipe = hpcs.pipeline()
+        pipe.lag(k=1)
+
+        x = np.array([10.0, 20.0, 30.0, 40.0])
+        result = pipe.execute(x)
+
+        assert np.isnan(result[0])
+        np.testing.assert_array_equal(result[1:], [10.0, 20.0, 30.0])
+
+
+class TestPipelineFinancialReturns:
+    """Test pipeline log_return and pct_change stages."""
+
+    def test_log_return_basic(self):
+        """Test log returns."""
+        pipe = hpcs.pipeline()
+        pipe.log_return()
+
+        x = np.array([100.0, 105.0, 103.0])
+        result = pipe.execute(x)
+
+        assert np.isnan(result[0])
+        np.testing.assert_almost_equal(result[1], np.log(105.0 / 100.0))
+        np.testing.assert_almost_equal(result[2], np.log(103.0 / 105.0))
+
+    def test_pct_change_basic(self):
+        """Test percentage change."""
+        pipe = hpcs.pipeline()
+        pipe.pct_change()
+
+        x = np.array([100.0, 110.0, 99.0])
+        result = pipe.execute(x)
+
+        assert np.isnan(result[0])
+        np.testing.assert_almost_equal(result[1], 0.10)  # 10% increase
+        np.testing.assert_almost_equal(result[2], -0.10)  # 10% decrease
+
+    def test_log_return_and_pct_change_similar_for_small_changes(self):
+        """Log return and pct_change should be similar for small changes."""
+        pipe_log = hpcs.pipeline().log_return()
+        pipe_pct = hpcs.pipeline().pct_change()
+
+        # Small price changes (1% moves)
+        x = np.array([100.0, 101.0, 100.5, 101.2, 100.8])
+
+        log_ret = pipe_log.execute(x)
+        pct_ret = pipe_pct.execute(x)
+
+        # For small changes, log return ≈ pct change
+        np.testing.assert_allclose(log_ret[1:], pct_ret[1:], rtol=0.02)
+
+
+class TestPipelineLinearTransforms:
+    """Test pipeline scale and shift stages."""
+
+    def test_scale_basic(self):
+        """Test scaling."""
+        pipe = hpcs.pipeline()
+        pipe.scale(factor=2.5)
+
+        x = np.array([1.0, 2.0, 3.0])
+        result = pipe.execute(x)
+
+        np.testing.assert_array_equal(result, x * 2.5)
+
+    def test_shift_basic(self):
+        """Test shifting."""
+        pipe = hpcs.pipeline()
+        pipe.shift(offset=-10.0)
+
+        x = np.array([15.0, 20.0, 25.0])
+        result = pipe.execute(x)
+
+        np.testing.assert_array_equal(result, x - 10.0)
+
+    def test_scale_and_shift_composition(self):
+        """Test scale followed by shift."""
+        pipe = hpcs.pipeline()
+        pipe.scale(factor=2.0)
+        pipe.shift(offset=5.0)
+
+        x = np.array([1.0, 2.0, 3.0])
+        result = pipe.execute(x)
+
+        # y = 2*x + 5
+        expected = x * 2.0 + 5.0
+        np.testing.assert_array_equal(result, expected)
+
+
+class TestPipelineMathOperations:
+    """Test pipeline abs and sqrt stages."""
+
+    def test_abs_basic(self):
+        """Test absolute value."""
+        pipe = hpcs.pipeline()
+        pipe.abs()
+
+        x = np.array([-1.0, 2.0, -3.0, 4.0])
+        result = pipe.execute(x)
+
+        np.testing.assert_array_equal(result, np.abs(x))
+
+    def test_sqrt_basic(self):
+        """Test square root."""
+        pipe = hpcs.pipeline()
+        pipe.sqrt()
+
+        x = np.array([1.0, 4.0, 9.0, 16.0])
+        result = pipe.execute(x)
+
+        np.testing.assert_array_equal(result, np.sqrt(x))
+
+
+class TestPipelineDomainWorkflows:
+    """Test domain-specific pipeline compositions."""
+
+    def test_finance_volatility(self):
+        """Finance: log returns -> ewvar -> sqrt = realized volatility."""
+        pipe = hpcs.pipeline()
+        pipe.log_return()
+        pipe.ewvar(alpha=0.1)
+        pipe.sqrt()
+
+        prices = np.array([100.0, 102.0, 101.0, 103.0, 102.5, 104.0])
+        vol = pipe.execute(prices)
+
+        assert len(vol) == len(prices)
+        assert vol[0] == 0.0  # ewvar[0] = 0 (initial variance), sqrt(0) = 0
+
+    def test_finance_drawdown_components(self):
+        """Finance: cumulative_max for high-water mark."""
+        prices = np.array([100.0, 105.0, 102.0, 108.0, 104.0])
+
+        pipe = hpcs.pipeline()
+        pipe.cumulative_max()
+        hwm = pipe.execute(prices)
+
+        # High-water mark should be [100, 105, 105, 108, 108]
+        expected_hwm = np.array([100.0, 105.0, 105.0, 108.0, 108.0])
+        np.testing.assert_array_equal(hwm, expected_hwm)
+
+        # Drawdown = price - high_water_mark
+        drawdown = prices - hwm
+        assert drawdown[0] == 0  # No drawdown at start
+        assert drawdown[2] == 102 - 105  # -3
+
+    def test_signal_lowpass_filter(self):
+        """Engineering: convolve with moving average kernel."""
+        # 5-point moving average as low-pass filter
+        kernel = np.ones(5) / 5.0
+
+        pipe = hpcs.pipeline()
+        pipe.convolve(kernel)
+
+        # Noisy signal
+        np.random.seed(42)
+        x = np.random.randn(100) + 10.0
+        smoothed = pipe.execute(x)
+
+        assert len(smoothed) == 96  # 100 - 5 + 1
+
+    def test_data_quality_pipeline(self):
+        """Data quality: fill_forward -> abs."""
+        pipe = hpcs.pipeline()
+        pipe.fill_forward()
+        pipe.abs()
+
+        # Data with gaps and negatives
+        x = np.array([1.0, np.nan, -3.0, np.nan, np.nan, -6.0])
+        result = pipe.execute(x)
+
+        # After fill_forward: [1, 1, -3, -3, -3, -6]
+        # After abs: [1, 1, 3, 3, 3, 6]
+        expected = np.array([1.0, 1.0, 3.0, 3.0, 3.0, 6.0])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_annualized_volatility(self):
+        """Finance: log returns -> rolling_std -> scale(sqrt(252))."""
+        pipe = hpcs.pipeline()
+        pipe.log_return()
+        pipe.rolling_std(window=20)
+        pipe.scale(factor=np.sqrt(252))  # Annualize
+
+        # Simulated daily prices
+        np.random.seed(42)
+        prices = 100.0 * np.exp(np.cumsum(np.random.randn(100) * 0.01))
+
+        ann_vol = pipe.execute(prices)
+        assert len(ann_vol) == len(prices)
+
+
+class TestPipelineSummary:
+    """Test that new stages appear correctly in summary."""
+
+    def test_summary_includes_new_stages(self):
+        """Test that pipeline summary includes new stage names."""
+        pipe = hpcs.pipeline()
+        pipe.cumulative_max()
+        pipe.log_return()
+        pipe.scale(factor=2.0)
+        pipe.sqrt()
+
+        summary = pipe.summary()
+
+        assert 'cumulative_max' in summary
+        assert 'log_return' in summary
+        assert 'scale' in summary
+        assert 'sqrt' in summary
+
+    def test_summary_shows_params(self):
+        """Test that summary shows stage parameters."""
+        pipe = hpcs.pipeline()
+        pipe.lag(k=5)
+        pipe.convolve(np.ones(7) / 7.0)
+        pipe.scale(factor=3.14)
+        pipe.shift(offset=-100.5)
+
+        summary = pipe.summary()
+
+        assert 'k=5' in summary
+        assert 'm=7' in summary
+        assert '3.14' in summary
+        assert '-100.5' in summary
+
+
+class TestPipelineChaining:
+    """Test that new stages support method chaining."""
+
+    def test_chaining_new_stages(self):
+        """Test that new stages return self for chaining."""
+        pipe = (hpcs.pipeline()
+                .fill_forward()
+                .log_return()
+                .abs()
+                .rolling_mean(window=5)
+                .scale(factor=100))
+
+        summary = pipe.summary()
+        assert 'fill_forward' in summary
+        assert 'log_return' in summary
+        assert 'abs' in summary
+        assert 'rolling_mean' in summary
+        assert 'scale' in summary

@@ -36,6 +36,7 @@ module hpcs_core_batched
   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
   use hpcs_constants
   use hpcs_core_stats, only: hpcs_median, hpcs_mad, hpcs_quantile
+  use hpcs_core_execution_mode, only: hpcs_get_execution_mode_internal
   use hpcs_cpu_detect  ! Hardware-aware adaptive parallelization
   implicit none
   private
@@ -326,7 +327,9 @@ contains
   !   y      - double*       output array of length n
   !   status - int*          output status code
   !--------------------------------------------------------------------------
-  subroutine hpcs_reduce_sum_axis1(x, n, m, y, status) &
+  ! hpcs_reduce_sum_axis1 (v0.8.0 dispatcher with execution mode support)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_sum_axis1(x, n, m, y, mode, status) &
        bind(C, name="hpcs_reduce_sum_axis1")
     use iso_c_binding, only: c_int, c_double
     implicit none
@@ -334,51 +337,35 @@ contains
     integer(c_int),  value      :: n
     integer(c_int),  value      :: m
     real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: n_eff, m_eff
-    integer(c_int) :: row, col, idx
-    real(c_double) :: acc
-    logical        :: has_nan
+    integer(c_int) :: effective_mode
 
-    n_eff = n
-    m_eff = m
-    if (n_eff <= 0_c_int .or. m_eff <= 0_c_int) then
-      status = HPCS_ERR_INVALID_ARGS
-      return
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
     end if
 
-    ! Loop over rows
-    ! OpenMP disabled: this operation is too fast and memory-bound, overhead exceeds benefit
-    do row = 1_c_int, n_eff
-      acc = 0.0_c_double
-      has_nan = .false.
-      ! Sum across columns for this row
-      do col = 1_c_int, m_eff
-        idx = row + (col - 1_c_int) * n_eff
-        if (x(idx) /= x(idx)) then
-          has_nan = .true.
-        else
-          acc = acc + x(idx)
-        end if
-      end do
-      if (has_nan) then
-        y(row) = ieee_value(0.0_c_double, ieee_quiet_nan)
-      else
-        y(row) = acc
-      end if
-    end do
-    status = HPCS_SUCCESS
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_reduce_sum_axis1_safe(x, n, m, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_reduce_sum_axis1_fast(x, n, m, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_reduce_sum_axis1_deterministic(x, n, m, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
   end subroutine hpcs_reduce_sum_axis1
 
   !--------------------------------------------------------------------------
-  ! hpcs_reduce_mean_axis1
-  !
-  ! Compute the mean along axis-1 for each row of x(n,m).  NaNs propagate.
-  ! Complexity: O(n*m).
+  ! SAFE mode: Full NaN detection
   !--------------------------------------------------------------------------
-  subroutine hpcs_reduce_mean_axis1(x, n, m, y, status) &
-       bind(C, name="hpcs_reduce_mean_axis1")
+  subroutine hpcs_reduce_sum_axis1_safe(x, n, m, y, status)
     use iso_c_binding, only: c_int, c_double
     implicit none
     real(c_double), intent(in)  :: x(*)
@@ -387,8 +374,7 @@ contains
     real(c_double), intent(out) :: y(*)
     integer(c_int),  intent(out):: status
 
-    integer(c_int) :: n_eff, m_eff
-    integer(c_int) :: row, col, idx
+    integer(c_int) :: n_eff, m_eff, row, col, idx
     real(c_double) :: acc
     logical        :: has_nan
 
@@ -399,26 +385,212 @@ contains
       return
     end if
 
-    ! OpenMP disabled: this operation is too fast and memory-bound, overhead exceeds benefit
+    ! Loop over rows (no OpenMP - memory-bound operation)
     do row = 1_c_int, n_eff
       acc = 0.0_c_double
       has_nan = .false.
+
+      ! Sum across columns for this row
       do col = 1_c_int, m_eff
         idx = row + (col - 1_c_int) * n_eff
-        if (x(idx) /= x(idx)) then
+        if (x(idx) /= x(idx)) then  ! NaN check
           has_nan = .true.
         else
           acc = acc + x(idx)
         end if
       end do
+
+      if (has_nan) then
+        y(row) = ieee_value(0.0_c_double, ieee_quiet_nan)
+      else
+        y(row) = acc
+      end if
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_reduce_sum_axis1_safe
+
+  !--------------------------------------------------------------------------
+  ! FAST mode: No NaN checks, maximum speed
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_sum_axis1_fast(x, n, m, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: m
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: row, col, idx
+    real(c_double) :: acc
+
+    ! No input validation - assume valid
+
+    ! Loop over rows - no NaN checks
+    do row = 1_c_int, n
+      acc = 0.0_c_double
+
+      ! Direct sum across columns
+      do col = 1_c_int, m
+        idx = row + (col - 1_c_int) * n
+        acc = acc + x(idx)
+      end do
+
+      y(row) = acc
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_reduce_sum_axis1_fast
+
+  !--------------------------------------------------------------------------
+  ! DETERMINISTIC mode: Same as SAFE (already sequential)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_sum_axis1_deterministic(x, n, m, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: m
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    ! Already sequential - same as SAFE
+    call hpcs_reduce_sum_axis1_safe(x, n, m, y, status)
+  end subroutine hpcs_reduce_sum_axis1_deterministic
+
+  !--------------------------------------------------------------------------
+  ! hpcs_reduce_mean_axis1 (v0.8.0 dispatcher with execution mode support)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_mean_axis1(x, n, m, y, mode, status) &
+       bind(C, name="hpcs_reduce_mean_axis1")
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: m
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: effective_mode
+
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
+    ! Dispatch to appropriate implementation
+    select case (effective_mode)
+      case (HPCS_MODE_SAFE)
+        call hpcs_reduce_mean_axis1_safe(x, n, m, y, status)
+      case (HPCS_MODE_FAST)
+        call hpcs_reduce_mean_axis1_fast(x, n, m, y, status)
+      case (HPCS_MODE_DETERMINISTIC)
+        call hpcs_reduce_mean_axis1_deterministic(x, n, m, y, status)
+      case default
+        status = HPCS_ERR_INVALID_ARGS
+    end select
+  end subroutine hpcs_reduce_mean_axis1
+
+  !--------------------------------------------------------------------------
+  ! SAFE mode: Full NaN detection
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_mean_axis1_safe(x, n, m, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: m
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: n_eff, m_eff, row, col, idx
+    real(c_double) :: acc
+    logical        :: has_nan
+
+    n_eff = n
+    m_eff = m
+    if (n_eff <= 0_c_int .or. m_eff <= 0_c_int) then
+      status = HPCS_ERR_INVALID_ARGS
+      return
+    end if
+
+    ! Loop over rows (no OpenMP - memory-bound operation)
+    do row = 1_c_int, n_eff
+      acc = 0.0_c_double
+      has_nan = .false.
+
+      ! Sum across columns for this row
+      do col = 1_c_int, m_eff
+        idx = row + (col - 1_c_int) * n_eff
+        if (x(idx) /= x(idx)) then  ! NaN check
+          has_nan = .true.
+        else
+          acc = acc + x(idx)
+        end if
+      end do
+
       if (has_nan) then
         y(row) = ieee_value(0.0_c_double, ieee_quiet_nan)
       else
         y(row) = acc / real(m_eff, kind=c_double)
       end if
     end do
+
     status = HPCS_SUCCESS
-  end subroutine hpcs_reduce_mean_axis1
+  end subroutine hpcs_reduce_mean_axis1_safe
+
+  !--------------------------------------------------------------------------
+  ! FAST mode: No NaN checks, maximum speed
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_mean_axis1_fast(x, n, m, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: m
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    integer(c_int) :: row, col, idx
+    real(c_double) :: acc
+
+    ! No input validation - assume valid
+
+    ! Loop over rows - no NaN checks
+    do row = 1_c_int, n
+      acc = 0.0_c_double
+
+      ! Direct sum across columns
+      do col = 1_c_int, m
+        idx = row + (col - 1_c_int) * n
+        acc = acc + x(idx)
+      end do
+
+      y(row) = acc / real(m, kind=c_double)
+    end do
+
+    status = HPCS_SUCCESS
+  end subroutine hpcs_reduce_mean_axis1_fast
+
+  !--------------------------------------------------------------------------
+  ! DETERMINISTIC mode: Same as SAFE (already sequential)
+  !--------------------------------------------------------------------------
+  subroutine hpcs_reduce_mean_axis1_deterministic(x, n, m, y, status)
+    use iso_c_binding, only: c_int, c_double
+    implicit none
+    real(c_double), intent(in)  :: x(*)
+    integer(c_int),  value      :: n
+    integer(c_int),  value      :: m
+    real(c_double), intent(out) :: y(*)
+    integer(c_int),  intent(out):: status
+
+    ! Already sequential - same as SAFE
+    call hpcs_reduce_mean_axis1_safe(x, n, m, y, status)
+  end subroutine hpcs_reduce_mean_axis1_deterministic
 
   !--------------------------------------------------------------------------
   ! hpcs_median_axis1
@@ -428,7 +600,7 @@ contains
   ! values in a row are NaN, the result is NaN.  Complexity: O(n*m) using
   ! Quickselect.
   !--------------------------------------------------------------------------
-  subroutine hpcs_median_axis1(x, n, m, y, status) &
+  subroutine hpcs_median_axis1(x, n, m, y, mode, status) &
        bind(C, name="hpcs_median_axis1")
     use iso_c_binding, only: c_int, c_double
     implicit none
@@ -436,12 +608,14 @@ contains
     integer(c_int),  value      :: n
     integer(c_int),  value      :: m
     real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
     integer(c_int) :: n_eff, m_eff
     integer(c_int) :: row, col, idx
     real(c_double), allocatable :: buf(:)
     integer(c_int) :: st, threshold
+    integer(c_int) :: effective_mode
 
     n_eff = n
     m_eff = m
@@ -450,9 +624,16 @@ contains
       return
     end if
 
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
     threshold = hpcs_cpu_get_threshold(3)  ! THRESHOLD_COMPUTE_HEAVY
 
-!$omp parallel do default(none) shared(x,y,n_eff,m_eff,threshold) &
+!$omp parallel do default(none) shared(x,y,n_eff,m_eff,threshold,effective_mode) &
 !$omp private(row,col,idx,buf,st) if(n_eff*m_eff > threshold)
     do row = 1_c_int, n_eff
       ! Copy row values into buffer
@@ -462,7 +643,7 @@ contains
         buf(col) = x(idx)
       end do
       ! Compute median
-      call hpcs_median(buf, m_eff, y(row), st)
+      call hpcs_median(buf, m_eff, y(row), effective_mode, st)
       deallocate(buf)
     end do
 !$omp end parallel do
@@ -477,7 +658,7 @@ contains
   ! Copy each row into a buffer and call hpcs_mad.  Status is aggregated:
   ! if any row has MAD ≈ 0, status = HPCS_ERR_NUMERIC_FAIL.
   !--------------------------------------------------------------------------
-  subroutine hpcs_mad_axis1(x, n, m, y, status) &
+  subroutine hpcs_mad_axis1(x, n, m, y, mode, status) &
        bind(C, name="hpcs_mad_axis1")
     use iso_c_binding, only: c_int, c_double
     implicit none
@@ -485,12 +666,14 @@ contains
     integer(c_int),  value      :: n
     integer(c_int),  value      :: m
     real(c_double), intent(out) :: y(*)
+    integer(c_int),  value      :: mode
     integer(c_int),  intent(out):: status
 
     integer(c_int) :: n_eff, m_eff
     integer(c_int) :: row, col, idx
     real(c_double), allocatable :: buf(:)
     integer(c_int) :: st, max_status, threshold
+    integer(c_int) :: effective_mode
 
     n_eff = n
     m_eff = m
@@ -499,10 +682,17 @@ contains
       return
     end if
 
+    ! Resolve execution mode
+    if (mode == HPCS_MODE_USE_GLOBAL) then
+      call hpcs_get_execution_mode_internal(effective_mode)
+    else
+      effective_mode = mode
+    end if
+
     max_status = HPCS_SUCCESS
     threshold = hpcs_cpu_get_threshold(3)  ! THRESHOLD_COMPUTE_HEAVY
 
-!$omp parallel do default(none) shared(x,y,n_eff,m_eff,max_status,threshold) &
+!$omp parallel do default(none) shared(x,y,n_eff,m_eff,max_status,threshold,effective_mode) &
 !$omp private(row,col,idx,buf,st) if(n_eff*m_eff > threshold)
     do row = 1_c_int, n_eff
       allocate(buf(m_eff))
@@ -510,7 +700,7 @@ contains
         idx = row + (col - 1_c_int) * n_eff
         buf(col) = x(idx)
       end do
-      call hpcs_mad(buf, m_eff, y(row), st)
+      call hpcs_mad(buf, m_eff, y(row), effective_mode, st)
       if (st > max_status) max_status = st
       deallocate(buf)
     end do
@@ -563,7 +753,7 @@ contains
         idx = row + (col - 1_c_int) * n_eff
         buf(col) = x(idx)
       end do
-      call hpcs_quantile(buf, m_eff, q, y(row), st)
+      call hpcs_quantile(buf, m_eff, q, y(row), HPCS_MODE_SAFE, st)
       deallocate(buf)
     end do
 !$omp end parallel do
@@ -630,11 +820,11 @@ contains
       end do
 
       ! Compute median
-      call hpcs_median(buf, m_eff, med, st)
+      call hpcs_median(buf, m_eff, med, HPCS_MODE_SAFE, st)
       if (st > max_status) max_status = st
 
       ! Compute MAD
-      call hpcs_mad(buf, m_eff, mad_val, st)
+      call hpcs_mad(buf, m_eff, mad_val, HPCS_MODE_SAFE, st)
       if (st == HPCS_ERR_NUMERIC_FAIL) then
         ! MAD ≈ 0: set all z-scores to 0
         do col = 1_c_int, m_eff

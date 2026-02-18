@@ -5,7 +5,7 @@ All notable changes to HPCSeries Core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0] - 2025-01-06 (Current)
+## [0.8.0] - 2026-02-18 (Current)
 
 ### Added
 
@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe implementation using OpenMP threadprivate storage
 - Zero overhead via compile-time dispatcher pattern
 - 8 functions with mode support: ewma, ewvar, ewstd, cumulative_min, cumulative_max, convolve_valid, trimmed_mean, winsorized_mean
+
+**Pipeline API** — Composable kernel execution
+- 24 pipeline stages total (12 original + 12 new in v0.8.0)
+- New stages: `cumulative_min()`, `cumulative_max()`, `fill_forward()`, `prefix_sum()`, `convolve(kernel)`, `lag(k)`, `log_return()`, `pct_change()`, `scale(factor)`, `shift(offset)`, `abs()`, `sqrt()`
+- `pipeline_execute()` gains `out_n` output parameter (actual output length, needed for `convolve` which shortens the array)
+- Optional `workspace` for memory-intensive pipelines
+- Python API: chained method style `p.ewma(0.1).zscore().execute(x)` (unchanged)
+- C API note: `pipeline_execute()` signature adds `size_t *out_n` parameter
+
+**Workspace API** — Pre-allocated SIMD-aligned memory
+- `workspace(bytes=67108864)` — 64-byte aligned, 64 MB default
+- `.size` property returns current allocated bytes
+- `.reserve(bytes)` method for explicit reallocation
+- Passed to `pipeline(ws=...)` for zero-allocation execution on hot paths
 
 **Exponential Weighted Statistics (Group A)** - 15-60x faster than pandas
 - `ewma()` - Exponentially weighted moving average with execution modes
