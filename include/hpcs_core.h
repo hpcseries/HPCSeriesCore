@@ -1587,6 +1587,20 @@ int pipeline_add_robust_zscore(pipeline_t *plan, double eps, int *status);
 int pipeline_add_normalize_minmax(pipeline_t *plan, int *status);
 int pipeline_add_clip(pipeline_t *plan, double min_val, double max_val, int *status);
 
+/* New pipeline stages (v0.8.0) */
+int pipeline_add_cumulative_min(pipeline_t *plan, int *status);
+int pipeline_add_cumulative_max(pipeline_t *plan, int *status);
+int pipeline_add_fill_forward(pipeline_t *plan, int *status);
+int pipeline_add_prefix_sum(pipeline_t *plan, int *status);
+int pipeline_add_convolve(pipeline_t *plan, const double *kernel, int m, int *status);
+int pipeline_add_lag(pipeline_t *plan, int k, int *status);
+int pipeline_add_log_return(pipeline_t *plan, int *status);
+int pipeline_add_pct_change(pipeline_t *plan, int *status);
+int pipeline_add_scale(pipeline_t *plan, double factor, int *status);
+int pipeline_add_shift(pipeline_t *plan, double offset, int *status);
+int pipeline_add_abs(pipeline_t *plan, int *status);
+int pipeline_add_sqrt(pipeline_t *plan, int *status);
+
 /* Execute plan on input array
  *
  * Parameters:
@@ -1594,6 +1608,7 @@ int pipeline_add_clip(pipeline_t *plan, double min_val, double max_val, int *sta
  *   x      - Input array
  *   n      - Number of elements
  *   out    - Output array (must be pre-allocated, same size as x)
+ *   out_n  - Output: actual number of elements in result (may be < n for convolve)
  *   status - 0=success, 1=invalid args, 2=numeric failure, 3=workspace too small
  */
 void pipeline_execute(
@@ -1601,6 +1616,7 @@ void pipeline_execute(
     const double *x,
     size_t n,
     double *out,
+    size_t *out_n,
     int *status
 );
 

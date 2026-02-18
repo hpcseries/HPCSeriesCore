@@ -75,7 +75,22 @@ cdef extern from "hpcs_core.h":
     int pipeline_add_robust_zscore(pipeline_t *plan, double eps, int *status)
     int pipeline_add_normalize_minmax(pipeline_t *plan, int *status)
     int pipeline_add_clip(pipeline_t *plan, double min_val, double max_val, int *status)
-    void pipeline_execute(const pipeline_t *plan, const double *x, size_t n, double *out, int *status)
+
+    # New pipeline stages (v0.8.0)
+    int pipeline_add_cumulative_min(pipeline_t *plan, int *status)
+    int pipeline_add_cumulative_max(pipeline_t *plan, int *status)
+    int pipeline_add_fill_forward(pipeline_t *plan, int *status)
+    int pipeline_add_prefix_sum(pipeline_t *plan, int *status)
+    int pipeline_add_convolve(pipeline_t *plan, const double *kernel, int m, int *status)
+    int pipeline_add_lag(pipeline_t *plan, int k, int *status)
+    int pipeline_add_log_return(pipeline_t *plan, int *status)
+    int pipeline_add_pct_change(pipeline_t *plan, int *status)
+    int pipeline_add_scale(pipeline_t *plan, double factor, int *status)
+    int pipeline_add_shift(pipeline_t *plan, double offset, int *status)
+    int pipeline_add_abs(pipeline_t *plan, int *status)
+    int pipeline_add_sqrt(pipeline_t *plan, int *status)
+
+    void pipeline_execute(const pipeline_t *plan, const double *x, size_t n, double *out, size_t *out_n, int *status)
     const char* pipeline_summary(const pipeline_t *plan)
 
     # Reduction functions
@@ -2388,6 +2403,169 @@ cdef class pipeline:
         check_status(status, "pipeline_add_clip")
         return self
 
+    # -------------------------------------------------------------------------
+    # New Pipeline Stages (v0.8.0)
+    # -------------------------------------------------------------------------
+
+    def cumulative_min(self):
+        """Add cumulative minimum (running min) stage.
+
+        Computes the running minimum: y[t] = min(x[0:t+1])
+        Useful for tracking lowest values, loss floors.
+        """
+        cdef int status
+        pipeline_add_cumulative_min(self._plan, &status)
+        check_status(status, "pipeline_add_cumulative_min")
+        return self
+
+    def cumulative_max(self):
+        """Add cumulative maximum (running max / high-water mark) stage.
+
+        Computes the running maximum: y[t] = max(x[0:t+1])
+        Useful for tracking peak values, high-water marks in finance.
+        """
+        cdef int status
+        pipeline_add_cumulative_max(self._plan, &status)
+        check_status(status, "pipeline_add_cumulative_max")
+        return self
+
+    def fill_forward(self):
+        """Add forward fill (LOCF) stage.
+
+        Propagates the last valid (non-NaN) value forward.
+        Useful for handling missing data in time series.
+        """
+        cdef int status
+        pipeline_add_fill_forward(self._plan, &status)
+        check_status(status, "pipeline_add_fill_forward")
+        return self
+
+    def prefix_sum(self):
+        """Add cumulative sum (prefix sum) stage.
+
+        Computes inclusive prefix sum: y[i] = sum(x[0:i+1])
+        Useful for numerical integration, running totals.
+        """
+        cdef int status
+        pipeline_add_prefix_sum(self._plan, &status)
+        check_status(status, "pipeline_add_prefix_sum")
+        return self
+
+    def convolve(self, kernel):
+        """Add FIR filter convolution stage (valid mode).
+
+        Parameters
+        ----------
+        kernel : array_like
+            Filter kernel coefficients
+
+        Note: Output length = input_length - kernel_length + 1
+        Useful for signal processing (low-pass, high-pass filters).
+        """
+        cdef cnp.ndarray[cnp.float64_t, ndim=1] k = ensure_c_contiguous(kernel)
+        cdef int m = k.shape[0]
+        cdef int status
+        pipeline_add_convolve(self._plan, &k[0], m, &status)
+        check_status(status, "pipeline_add_convolve")
+        return self
+
+    def lag(self, int k=1):
+        """Add lag stage.
+
+        Parameters
+        ----------
+        k : int
+            Lag order (number of periods to shift back)
+
+        Computes: y[t] = x[t-k], with first k values set to NaN.
+        Useful for time-lagged analysis, autocorrelation features.
+        """
+        cdef int status
+        pipeline_add_lag(self._plan, k, &status)
+        check_status(status, "pipeline_add_lag")
+        return self
+
+    def log_return(self):
+        """Add log return stage.
+
+        Computes: y[t] = log(x[t] / x[t-1])
+        First value is NaN.
+
+        Foundation for volatility calculations, Sharpe ratio.
+        Preferred over simple returns for statistical properties.
+        """
+        cdef int status
+        pipeline_add_log_return(self._plan, &status)
+        check_status(status, "pipeline_add_log_return")
+        return self
+
+    def pct_change(self):
+        """Add percentage change stage.
+
+        Computes: y[t] = (x[t] - x[t-1]) / x[t-1]
+        First value is NaN.
+
+        Useful for simple returns, growth rates.
+        """
+        cdef int status
+        pipeline_add_pct_change(self._plan, &status)
+        check_status(status, "pipeline_add_pct_change")
+        return self
+
+    def scale(self, double factor):
+        """Add scale (multiplication) stage.
+
+        Parameters
+        ----------
+        factor : float
+            Scaling factor
+
+        Computes: y[i] = x[i] * factor
+        Useful for unit conversion, amplitude adjustment.
+        """
+        cdef int status
+        pipeline_add_scale(self._plan, factor, &status)
+        check_status(status, "pipeline_add_scale")
+        return self
+
+    def shift(self, double offset):
+        """Add shift (addition) stage.
+
+        Parameters
+        ----------
+        offset : float
+            Value to add
+
+        Computes: y[i] = x[i] + offset
+        Useful for baseline adjustment, centering.
+        """
+        cdef int status
+        pipeline_add_shift(self._plan, offset, &status)
+        check_status(status, "pipeline_add_shift")
+        return self
+
+    def abs(self):
+        """Add absolute value stage.
+
+        Computes: y[i] = |x[i]|
+        Useful for magnitude calculations, absolute deviations.
+        """
+        cdef int status
+        pipeline_add_abs(self._plan, &status)
+        check_status(status, "pipeline_add_abs")
+        return self
+
+    def sqrt(self):
+        """Add square root stage.
+
+        Computes: y[i] = sqrt(x[i])
+        Useful for converting variance to std, RMS calculations.
+        """
+        cdef int status
+        pipeline_add_sqrt(self._plan, &status)
+        check_status(status, "pipeline_add_sqrt")
+        return self
+
     def execute(self, x):
         """
         Execute pipeline on input array.
@@ -2400,10 +2578,11 @@ cdef class pipeline:
         Returns
         -------
         result : ndarray
-            Processed output array
+            Processed output array (may be smaller than input if convolve is used)
         """
         cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
         cdef size_t n = arr.shape[0]
+        cdef size_t out_n = n
         cdef cnp.ndarray[cnp.float64_t, ndim=1] result = np.empty(n, dtype=np.float64)
         cdef int status
 
@@ -2415,8 +2594,12 @@ cdef class pipeline:
         else:
             set_execution_mode('safe')
 
-        pipeline_execute(self._plan, &arr[0], n, &result[0], &status)
+        pipeline_execute(self._plan, &arr[0], n, &result[0], &out_n, &status)
         check_status(status, "pipeline_execute")
+
+        # Return only the valid output (may be smaller due to convolve)
+        if out_n < n:
+            return result[:out_n].copy()
         return result
 
     def execute_into(self, x, out):
@@ -2429,10 +2612,16 @@ cdef class pipeline:
             Input array
         out : ndarray
             Output array (must be same size as input)
+
+        Returns
+        -------
+        out_n : int
+            Actual number of output elements (may be < len(x) if convolve used)
         """
         cdef cnp.ndarray[cnp.float64_t, ndim=1] arr = ensure_c_contiguous(x)
         cdef cnp.ndarray[cnp.float64_t, ndim=1] out_arr = np.asarray(out, dtype=np.float64)
         cdef size_t n = arr.shape[0]
+        cdef size_t out_n = n
         cdef int status
 
         if out_arr.shape[0] < n:
@@ -2445,8 +2634,9 @@ cdef class pipeline:
         else:
             set_execution_mode('safe')
 
-        pipeline_execute(self._plan, &arr[0], n, &out_arr[0], &status)
+        pipeline_execute(self._plan, &arr[0], n, &out_arr[0], &out_n, &status)
         check_status(status, "pipeline_execute")
+        return out_n
 
     def summary(self):
         """

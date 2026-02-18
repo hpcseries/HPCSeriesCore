@@ -3,7 +3,7 @@ message: "If you use HPCSeries Core in your research, please cite it as below."
 type: software
 title: "HPCSeries Core: High-Performance Statistical Computing for Large-Scale Data Analysis"
 version: 0.8.0
-date-released: 2026-01-14
+date-released: 2026-02-18
 url: "https://github.com/hpcseries/HPCSeriesCore"
 repository-code: "https://github.com/hpcseries/HPCSeriesCore"
 license: Apache-2.0
@@ -35,7 +35,7 @@ preferred-citation:
   title: "HPCSeries Core: High-Performance Statistical Computing for Large-Scale Data Analysis"
   version: 0.8.0
   year: 2026
-  month: 1
+  month: 2
   authors:
     - family-names: "HPCSeries Core Contributors"
       affiliation: "Independent"
